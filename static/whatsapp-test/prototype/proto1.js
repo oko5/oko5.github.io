@@ -23,17 +23,21 @@ if (header) {
         }));
 
         setTimeout(() => {
+            // Member count
             const membersButton = [...document.querySelectorAll('button')]
                 .find(btn => /^\d+\s+members$/.test(btn.textContent.trim()));
 
+            // Group name
             const groupNameElement = document.querySelector(
                 '[data-testid^="group-info-drawer-subject-input-read-only"]'
             );
 
+            // Members list
             const memberList = document.querySelector(
                 '#pane-side [aria-label^="Members list:"]'
             );
 
+            // Admins
             const admin = [];
 
             if (memberList) {
@@ -56,13 +60,41 @@ if (header) {
                 });
             }
 
+            // Group owner
+            const ownerElement = [...document.querySelectorAll('span')]
+                .find(span =>
+                    span.textContent.trim().startsWith('Group created by ')
+                );
+
+            let owner = null;
+
+            if (ownerElement) {
+                const ownerText = ownerElement.textContent.trim();
+
+                // Extract name between "Group created by " and ", on"
+                const match = ownerText.match(
+                    /^Group created by (.*?),\s*on\s/
+                );
+
+                if (match) {
+                    owner = match[1].trim();
+                }
+            }
+
+            // Final JSON object
             const data = {
                 groupName: groupNameElement?.textContent.trim() || null,
                 members: membersButton?.textContent.trim() || null,
-                admin: admin
+                admin: admin,
+                owner: owner
             };
 
             console.log(JSON.stringify(data, null, 2));
+
+            // Check if you are an admin
+            if (!admin.includes("You")) {
+                console.error("You are not an admin");
+            }
 
         }, 100);
     }
