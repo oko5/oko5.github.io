@@ -1,5 +1,11 @@
+console.clear();
 (async () => {
-    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const sleep = ms =>
+        new Promise(resolve => setTimeout(resolve, ms));
+
+    // =========================================================
+    // CLICK HELPER
+    // =========================================================
 
     const dispatchClick = element => {
         if (!element) return;
@@ -23,6 +29,7 @@
         }));
     };
 
+
     // =========================================================
     // OPEN GROUP INFORMATION
     // =========================================================
@@ -32,20 +39,21 @@
     );
 
     if (!header) {
-        console.error('Conversation header not found');
+        console.error('Conversation header not found.');
         return;
     }
 
-    const headerElement = header.firstElementChild?.children[1];
+    const headerElement =
+        header.firstElementChild?.children[1];
 
     if (!headerElement) {
-        console.error('Group header button not found');
+        console.error('Group header button not found.');
         return;
     }
 
     dispatchClick(headerElement);
 
-    await sleep(350);
+    await sleep(500);
 
 
     // =========================================================
@@ -54,7 +62,9 @@
 
     const membersButton = [...document.querySelectorAll('button')]
         .find(btn =>
-            /^\d+\s+members$/.test(btn.textContent.trim())
+            /^\d+\s+members$/i.test(
+                btn.textContent.trim()
+            )
         );
 
     const groupNameElement = document.querySelector(
@@ -75,6 +85,11 @@
     const memberNames = new Map();
     const admins = new Map();
 
+
+    // =========================================================
+    // COLLECT VISIBLE MEMBERS
+    // =========================================================
+
     const collectMembers = () => {
 
         const contactsModal = document.querySelector(
@@ -89,7 +104,7 @@
 
         rows.forEach(row => {
 
-            // Ignore alphabet section headers
+            // Ignore alphabetical section headers
             if (
                 row.querySelector(
                     '[data-testid="section-header"]'
@@ -111,10 +126,13 @@
 
             if (!name) return;
 
-            const key = name.toLocaleLowerCase();
+            const key =
+                name.toLocaleLowerCase();
 
             memberNames.set(key, name);
 
+
+            // Detect admin
             if (
                 row.querySelector(
                     '[data-testid="group-admin-marker"]'
@@ -127,19 +145,19 @@
 
 
     // =========================================================
-    // COLLECT CURRENTLY VISIBLE MEMBERS
+    // INITIAL COLLECTION
     // =========================================================
 
     collectMembers();
 
 
     // =========================================================
-    // CLICK VIEW ALL
+    // CLICK "VIEW ALL"
     // =========================================================
 
     const viewAll = [...document.querySelectorAll('div')]
         .find(div =>
-            /^View all \(\d+ more\)$/.test(
+            /^View all \(\d+ more\)$/i.test(
                 div.textContent.trim()
             )
         );
@@ -153,7 +171,7 @@
 
         dispatchClick(viewAll);
 
-        await sleep(450);
+        await sleep(700);
 
     } else {
 
@@ -164,7 +182,7 @@
 
 
     // =========================================================
-    // CONTACTS MODAL
+    // FIND CONTACTS MODAL
     // =========================================================
 
     const contactsModal = document.querySelector(
@@ -182,100 +200,282 @@
 
 
     // =========================================================
-    // FIND VIRTUALIZED SCROLL CONTAINER
+    // FIND REAL SCROLL CONTAINER
+    //
+    // Important:
+    //
+    // The element:
+    //
+    // style="height: 20539px"
+    //
+    // is the VIRTUAL CONTENT.
+    //
+    // We do NOT want to scroll that element.
+    //
+    // We want its ancestor that actually has:
+    //
+    // scrollHeight > clientHeight
     // =========================================================
 
-    const findScrollContainer = () => {
+    const getScrollableAncestors = element => {
 
-        const candidates = [
-            ...contactsModal.querySelectorAll('*')
-        ];
+        const result = [];
 
-        let best = null;
-        let bestScore = -1;
+        let current = element;
 
-        for (const element of candidates) {
+        while (
+            current &&
+            current !== document.body &&
+            current !== document.documentElement
+        ) {
 
-            const style = getComputedStyle(element);
+            const style =
+                getComputedStyle(current);
 
-            const scrollable =
-                style.overflowY === 'auto' ||
-                style.overflowY === 'scroll' ||
-                style.overflowY === 'overlay';
-
-            if (!scrollable) continue;
+            const overflowY =
+                style.overflowY;
 
             if (
-                element.scrollHeight <=
-                element.clientHeight
+                (
+                    overflowY === 'auto' ||
+                    overflowY === 'scroll' ||
+                    overflowY === 'overlay'
+                ) &&
+                current.scrollHeight >
+                    current.clientHeight
             ) {
-                continue;
+                result.push(current);
             }
 
-            const score =
-                element.scrollHeight -
-                element.clientHeight;
-
-            if (score > bestScore) {
-                best = element;
-                bestScore = score;
-            }
+            current =
+                current.parentElement;
         }
 
-        return best;
+        return result;
     };
 
 
-    let scrollContainer = findScrollContainer();
-
-
     // =========================================================
-    // FALLBACK SCROLL CONTAINER
+    // LOCATE LIST ITEM
     // =========================================================
 
-    if (!scrollContainer) {
-
-        const listItem = contactsModal.querySelector(
-            '[data-testid^="list-item-"]'
+    const firstListItem =
+        contactsModal.querySelector(
+            '[data-testid="list-item-1"]'
         );
 
-        if (listItem) {
 
-            let parent = listItem.parentElement;
+    // =========================================================
+    // LOCATE SCROLLABLE ELEMENT
+    // =========================================================
 
-            while (
-                parent &&
-                parent !== contactsModal
-            ) {
+    let scrollContainer = null;
 
-                if (
-                    parent.scrollHeight >
-                    parent.clientHeight
-                ) {
-                    scrollContainer = parent;
-                    break;
-                }
 
-                parent = parent.parentElement;
-            }
+    if (firstListItem) {
+
+        const ancestors =
+            getScrollableAncestors(
+                firstListItem
+            );
+
+        if (ancestors.length) {
+
+            /*
+             * Usually the closest scrollable ancestor
+             * is the correct WhatsApp virtual-list viewport.
+             */
+
+            scrollContainer =
+                ancestors[0];
         }
     }
 
 
     // =========================================================
-    // FAST VIRTUALIZED SCROLL
+    // SECONDARY SEARCH
+    // =========================================================
+
+    if (!scrollContainer) {
+
+        const allElements =
+            contactsModal.querySelectorAll('*');
+
+        let best = null;
+        let bestDifference = -1;
+
+        for (const element of allElements) {
+
+            const style =
+                getComputedStyle(element);
+
+            const overflowY =
+                style.overflowY;
+
+            if (
+                overflowY !== 'auto' &&
+                overflowY !== 'scroll' &&
+                overflowY !== 'overlay'
+            ) {
+                continue;
+            }
+
+            const difference =
+                element.scrollHeight -
+                element.clientHeight;
+
+            if (difference <= 0) {
+                continue;
+            }
+
+            /*
+             * Prefer the smallest usable scroll area.
+             * The giant 20539px virtual content element
+             * should therefore NOT be selected.
+             */
+
+            if (
+                best === null ||
+                difference < bestDifference
+            ) {
+                best = element;
+                bestDifference = difference;
+            }
+        }
+
+        scrollContainer = best;
+    }
+
+
+    // =========================================================
+    // REPORT SCROLL CONTAINER
     // =========================================================
 
     if (scrollContainer) {
 
         console.log(
-            'Fast-scrolling member list...'
+            '========== SCROLL CONTAINER =========='
         );
 
-        let lastTop = -1;
-        let stuckCount = 0;
+        console.log(
+            scrollContainer
+        );
 
-        const MAX_SCROLLS = 500;
+        console.log(
+            'clientHeight:',
+            scrollContainer.clientHeight
+        );
+
+        console.log(
+            'scrollHeight:',
+            scrollContainer.scrollHeight
+        );
+
+        console.log(
+            'scrollTop:',
+            scrollContainer.scrollTop
+        );
+    }
+
+
+    // =========================================================
+    // FORCE SCROLL FUNCTION
+    // =========================================================
+
+    const forceScroll = amount => {
+
+        if (!scrollContainer) return false;
+
+        const before =
+            scrollContainer.scrollTop;
+
+
+        // -----------------------------------------------------
+        // Method 1: direct scrollTop
+        // -----------------------------------------------------
+
+        scrollContainer.scrollTop =
+            before + amount;
+
+
+        // -----------------------------------------------------
+        // Method 2: scrollBy
+        // -----------------------------------------------------
+
+        try {
+
+            scrollContainer.scrollBy({
+                top: amount,
+                left: 0,
+                behavior: 'instant'
+            });
+
+        } catch {
+
+            scrollContainer.scrollTop =
+                before + amount;
+        }
+
+
+        // -----------------------------------------------------
+        // Method 3: Wheel event
+        // -----------------------------------------------------
+
+        try {
+
+            scrollContainer.dispatchEvent(
+                new WheelEvent('wheel', {
+                    bubbles: true,
+                    cancelable: true,
+                    deltaY: amount,
+                    deltaX: 0,
+                    deltaMode: 0
+                })
+            );
+
+        } catch {}
+
+
+        // -----------------------------------------------------
+        // Method 4: mouse wheel event
+        // -----------------------------------------------------
+
+        try {
+
+            scrollContainer.dispatchEvent(
+                new WheelEvent('mousewheel', {
+                    bubbles: true,
+                    cancelable: true,
+                    deltaY: amount,
+                    wheelDelta: -amount
+                })
+            );
+
+        } catch {}
+
+
+        return true;
+    };
+
+
+    // =========================================================
+    // VIRTUALIZED LIST SCROLLING
+    // =========================================================
+
+    if (scrollContainer) {
+
+        console.log(
+            '========== STARTING MEMBER SCROLL =========='
+        );
+
+        let previousTop = -1;
+
+        let unchangedCount = 0;
+
+        let lastMemberCount = 0;
+
+        const MAX_SCROLLS = 1000;
+
 
         for (
             let i = 0;
@@ -283,89 +483,183 @@
             i++
         ) {
 
-            // Collect currently rendered members
+            // -----------------------------------------------
+            // Collect currently rendered rows
+            // -----------------------------------------------
+
             collectMembers();
+
 
             const currentTop =
                 scrollContainer.scrollTop;
 
             const maxTop =
-                scrollContainer.scrollHeight -
-                scrollContainer.clientHeight;
+                Math.max(
+                    0,
+                    scrollContainer.scrollHeight -
+                    scrollContainer.clientHeight
+                );
 
-            // Bottom reached
+
+            // -----------------------------------------------
+            // Progress logging
+            // -----------------------------------------------
+
             if (
-                currentTop >= maxTop - 5
+                i % 10 === 0 ||
+                memberNames.size !== lastMemberCount
             ) {
 
-                await sleep(150);
+                console.log(
+                    `Scroll ${i} | position ${Math.round(currentTop)} / ${Math.round(maxTop)} | members ${memberNames.size}`
+                );
+
+                lastMemberCount =
+                    memberNames.size;
+            }
+
+
+            // -----------------------------------------------
+            // Bottom reached
+            // -----------------------------------------------
+
+            if (
+                currentTop >= maxTop - 3
+            ) {
+
+                await sleep(300);
 
                 collectMembers();
+
+                console.log(
+                    'Bottom reached.'
+                );
 
                 break;
             }
 
 
-            // Detect a stuck virtual list
+            // -----------------------------------------------
+            // Detect no movement
+            // -----------------------------------------------
+
             if (
-                Math.abs(currentTop - lastTop) < 1
+                Math.abs(
+                    currentTop -
+                    previousTop
+                ) < 1
             ) {
-                stuckCount++;
+
+                unchangedCount++;
+
             } else {
-                stuckCount = 0;
+
+                unchangedCount = 0;
             }
 
-            lastTop = currentTop;
+            previousTop =
+                currentTop;
 
 
-            // Large jump = much faster
-            const jump = Math.max(
-                700,
-                Math.floor(
-                    scrollContainer.clientHeight * 1.5
-                )
-            );
+            // -----------------------------------------------
+            // Normal jump
+            // -----------------------------------------------
 
-            scrollContainer.scrollTop =
-                Math.min(
-                    maxTop,
-                    currentTop + jump
+            const viewport =
+                scrollContainer.clientHeight;
+
+            const jump =
+                Math.max(
+                    300,
+                    Math.floor(
+                        viewport * 0.8
+                    )
                 );
 
 
-            /*
-             * Very short delay.
-             *
-             * 50ms is enough for most WhatsApp
-             * virtualized rows to update while
-             * keeping the scrolling fast.
-             */
-            await sleep(50);
+            forceScroll(jump);
+
+
+            // -----------------------------------------------
+            // Allow WhatsApp virtual list to render
+            // -----------------------------------------------
+
+            await sleep(100);
+
 
             collectMembers();
 
 
-            // If stuck, force a larger jump
-            if (stuckCount >= 3) {
+            // -----------------------------------------------
+            // If WhatsApp didn't move,
+            // use increasingly aggressive scrolling.
+            // -----------------------------------------------
+
+            if (unchangedCount >= 2) {
+
+                console.log(
+                    'Normal scroll did not move. Forcing scroll...'
+                );
+
+                const current =
+                    scrollContainer.scrollTop;
+
+                const max =
+                    Math.max(
+                        0,
+                        scrollContainer.scrollHeight -
+                        scrollContainer.clientHeight
+                    );
+
 
                 scrollContainer.scrollTop =
                     Math.min(
-                        maxTop,
-                        currentTop + 1500
+                        max,
+                        current + 1200
                     );
 
-                await sleep(100);
+
+                await sleep(150);
 
                 collectMembers();
 
-                stuckCount = 0;
+                unchangedCount = 0;
+            }
+
+
+            // -----------------------------------------------
+            // Last-resort bottom attempt
+            // -----------------------------------------------
+
+            if (unchangedCount >= 5) {
+
+                console.log(
+                    'Scroll appears stuck. Trying end position.'
+                );
+
+                scrollContainer.scrollTop =
+                    scrollContainer.scrollHeight;
+
+                await sleep(250);
+
+                collectMembers();
+
+                if (
+                    scrollContainer.scrollTop >=
+                    scrollContainer.scrollHeight -
+                    scrollContainer.clientHeight -
+                    3
+                ) {
+                    break;
+                }
             }
         }
+
 
     } else {
 
         console.warn(
-            'Could not find member-list scroll container.'
+            'Could not find the actual scroll container.'
         );
     }
 
@@ -383,25 +677,30 @@
 
     let owner = null;
 
-    const ownerElement = [
-        ...document.querySelectorAll('span')
-    ].find(span =>
-        span.textContent
-            .trim()
-            .startsWith('Group created by ')
-    );
+    const ownerElement =
+        [...document.querySelectorAll('span')]
+            .find(span =>
+                span.textContent
+                    .trim()
+                    .startsWith(
+                        'Group created by '
+                    )
+            );
+
 
     if (ownerElement) {
 
         const ownerText =
             ownerElement.textContent.trim();
 
-        const match = ownerText.match(
-            /^Group created by (.*?),\s*on\s/
-        );
+        const match =
+            ownerText.match(
+                /^Group created by (.*?),\s*on\s/
+            );
 
         if (match) {
-            owner = match[1].trim();
+            owner =
+                match[1].trim();
         }
     }
 
@@ -410,28 +709,36 @@
     // FINAL ARRAYS
     // =========================================================
 
-    const memberList = [...memberNames.values()];
-    const adminList = [...admins.values()];
+    const memberList =
+        [...memberNames.values()];
+
+    const adminList =
+        [...admins.values()];
 
 
     // =========================================================
-    // ACTUAL JAVASCRIPT OBJECT
-    // =========================================================
-    //
-    // This is NOT JSON.stringify().
-    //
-    // Chrome displays it as an expandable object,
-    // so the console is not flooded with one giant
-    // JSON string.
+    // FINAL DATA OBJECT
     // =========================================================
 
     const data = {
-        groupName: groupName,
-        members: memberCount,
-        memberCountExtracted: memberList.length,
-        memberList: memberList,
-        admin: adminList,
-        owner: owner
+
+        groupName:
+            groupName,
+
+        members:
+            memberCount,
+
+        memberCountExtracted:
+            memberList.length,
+
+        memberList:
+            memberList,
+
+        admin:
+            adminList,
+
+        owner:
+            owner
     };
 
 
@@ -440,7 +747,15 @@
     // =========================================================
 
     console.log(
-        '========== GROUP MEMBER EXTRACTION =========='
+        '============================================'
+    );
+
+    console.log(
+        'GROUP MEMBER EXTRACTION COMPLETE'
+    );
+
+    console.log(
+        '============================================'
     );
 
     console.log(
