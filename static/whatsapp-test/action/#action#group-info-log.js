@@ -23,12 +23,23 @@ if (header) {
         }));
 
         setTimeout(() => {
-            const button = [...document.querySelectorAll('button')]
-                .find(btn => /^\d+ members$/.test(btn.textContent.trim()));
+            const membersButton = [...document.querySelectorAll('button')]
+                .find(btn => /^\d+\s+members$/.test(btn.textContent.trim()));
 
-            if (button) {
-                console.log(button.textContent.trim());
+            const groupNameElement = document.querySelector(
+                '[data-testid^="group-info-drawer-subject-input-read-only"]'
+            );
+
+            if (membersButton && groupNameElement) {
+                const members = membersButton.textContent.trim();
+                const groupName = groupNameElement.textContent.trim();
+
+                console.log(`Member count: ${members}`);
+                console.log(`Group name: ${groupName}`);
+            } else {
+                console.log('Members button:', membersButton);
+                console.log('Group name element:', groupNameElement);
             }
-        }, 0);
+        }, 100);
     }
 }
