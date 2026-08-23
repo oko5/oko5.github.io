@@ -1,0 +1,413 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local Camera = Workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+local drawings = {}
+
+-- ================= HUD =================
+local function newText(color)
+    local t = Drawing.new("Text")
+    t.Size = 18
+    t.Center = true
+    t.Outline = true
+    t.Color = color
+    return t
+end
+
+local topSpeedText = newText(Color3.fromRGB(0, 255, 255))
+local topDirText = newText(Color3.fromRGB(255, 255, 255))
+local topAltAGL = newText(Color3.fromRGB(255, 150, 0))
+
+local topGuiPos = Vector2.new(Camera.ViewportSize.X / 2, 20)
+
+topSpeedText.Position = topGuiPos
+topDirText.Position = topGuiPos + Vector2.new(0, 20)
+topAltAGL.Position = topGuiPos + Vector2.new(0, 40)
+
+-- ================= DRAG =================
+local dragging = false
+local dragOffset = Vector2.zero
+
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local mouse = UserInputService:GetMouseLocation()
+
+        if (mouse - topSpeedText.Position).Magnitude < 120 then
+            dragging = true
+            dragOffset = mouse - topGuiPos
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        topGuiPos = UserInputService:GetMouseLocation() - dragOffset
+
+        topSpeedText.Position = topGuiPos
+        topDirText.Position = topGuiPos + Vector2.new(0, 20)
+        topAltAGL.Position = topGuiPos + Vector2.new(0, 40)
+    end
+end)
+
+-- ================= HELPERS =================
+local function degreesToDirection(deg)
+    local dirs = {"N","NE","E","SE","S","SW","W","NW"}
+    return dirs[math.floor((deg/45)+0.5)%8+1]
+end
+
+local function getDirectionFromLook(vec)
+    local a = math.deg(math.atan2(vec.X, vec.Z))
+    if a < 0 then a += 360 end
+    return degreesToDirection(a), math.floor(a)
+end
+
+local function getHealthColor(p)
+    if p > 0.6 then return Color3.fromRGB(0,255,0)
+    elseif p > 0.3 then return Color3.fromRGB(255,255,0)
+    else return Color3.fromRGB(255,0,0) end
+end
+
+-- ================= FIXED AGL =================
+local function getAltitudeAGL(pos)
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Blacklist
+
+    local ignore = {}
+
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p.Character then
+            table.insert(ignore, p.Character)
+        end
+    end
+
+    params.FilterDescendantsInstances = ignore
+    params.IgnoreWater = false
+
+    local result = Workspace:Raycast(pos, Vector3.new(0, -5000, 0), params)
+
+    if result then
+        return math.floor((pos - result.Position).Magnitude)
+    end
+
+    return math.floor(pos.Y)
+end
+
+-- visibility check
+local function isInViewAndFront(pos)
+    local camCF = Camera.CFrame
+    local dir = (pos - camCF.Position).Unit
+    if camCF.LookVector:Dot(dir) <= 0 then
+        return false
+    end
+    local _, onScreen = Camera:WorldToViewportPoint(pos)
+    return onScreen
+end
+
+local function getScreenBounds(a, b)
+    local tl = Vector2.new(math.min(a.X,b.X), math.min(a.Y,b.Y))
+    local s = Vector2.new(math.abs(a.X-b.X), math.abs(a.Y-b.Y))
+    return tl, s
+end
+
+-- ================= CLEANUP =================
+local function setup(p)
+    p.CharacterAdded:Connect(function()
+        drawings[p] = nil
+    end)
+end
+
+for _,p in ipairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then setup(p) end
+end
+
+Players.PlayerAdded:Connect(function(p)
+    if p ~= LocalPlayer then setup(p) end
+end)
+
+-- ================= LOOP =================
+RunService.RenderStepped:Connect(function()
+
+    -- ===== LOCAL HUD =====
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        local hrp = char.HumanoidRootPart
+
+        local spd = hrp.AssemblyLinearVelocity.Magnitude
+        local dir,deg = getDirectionFromLook(hrp.CFrame.LookVector)
+
+        topSpeedText.Text = "Speed: "..math.floor(spd)
+        topDirText.Text = "Dir: "..dir.." "..deg.."°"
+        topAltAGL.Text = "AGL: "..getAltitudeAGL(hrp.Position)
+
+        topSpeedText.Visible = true
+        topDirText.Visible = true
+        topAltAGL.Visible = true
+    end
+
+    -- ===== PLAYER ESP =====
+    for _,player in ipairs(Players:GetPlayers()) do
+        if player == LocalPlayer then continue end
+
+        local c = player.Character
+        local head = c and c:FindFirstChild("Head")
+        local hum = c and c:FindFirstChildOfClass("Humanoid")
+        local hrp = c and c:FindFirstChild("HumanoidRootPart")
+
+        if not (head and hum and hrp and hum.Health > 0 and isInViewAndFront(hrp.Position)) then
+            if drawings[player] then
+                for _,v in pairs(drawings[player]) do
+                    if typeof(v) == "table" then
+                        for _,l in ipairs(v) do l.Visible = false end
+                    else
+                        v.Visible = false
+                    end
+                end
+            end
+            continue
+        end
+
+        if not drawings[player] then
+            drawings[player] = {
+                Name = newText(Color3.fromRGB(255,255,0)),
+                Health = newText(Color3.fromRGB(255,255,255)),
+                Speed = newText(Color3.fromRGB(0,200,255)),
+                Dir = newText(Color3.fromRGB(180,180,255)),
+                AltAGL = newText(Color3.fromRGB(255,150,0)),
+                Distance = newText(Color3.fromRGB(255,255,255)),
+                ToMe = newText(Color3.fromRGB(255,200,100)), -- NEW LABEL
+                Edges = {}
+            }
+
+            for i=1,12 do
+                local l = Drawing.new("Line")
+                l.Thickness = 1
+                table.insert(drawings[player].Edges,l)
+            end
+        end
+
+        local d = drawings[player]
+        local bodyCF, bodySize = c:GetBoundingBox()
+
+        local v1,on1 = Camera:WorldToViewportPoint(bodyCF.Position - bodySize/2)
+        local v2,on2 = Camera:WorldToViewportPoint(bodyCF.Position + bodySize/2)
+
+        if not (on1 and on2) then continue end
+
+        local tl, size = getScreenBounds(v1,v2)
+        local x,y,w,h = tl.X,tl.Y,size.X,size.Y
+
+        local pts = {
+            Vector2.new(x,y),
+            Vector2.new(x+w,y),
+            Vector2.new(x+w,y+h),
+            Vector2.new(x,y+h)
+        }
+
+        local edges = {
+            {1,2},{2,3},{3,4},{4,1},{1,3},{2,4}
+        }
+
+        for i,line in ipairs(d.Edges) do
+            local e = edges[(i-1)%#edges+1]
+            line.From = pts[e[1]]
+            line.To = pts[e[2]]
+            line.Visible = true
+        end
+
+        d.Name.Text = player.Name
+        d.Name.Position = Vector2.new(x+w/2,y-20)
+        d.Name.Visible = true
+
+        local hp = hum.Health/hum.MaxHealth
+        d.Health.Text = "HP "..math.floor(hp*100)
+        d.Health.Color = getHealthColor(hp)
+        d.Health.Position = Vector2.new(x+w/2,y-40)
+        d.Health.Visible = true
+
+        local spd = hrp.AssemblyLinearVelocity.Magnitude
+        d.Speed.Text = "SPD "..math.floor(spd)
+        d.Speed.Position = Vector2.new(x+w/2,y-60)
+        d.Speed.Visible = true
+
+        local dir,deg = getDirectionFromLook(hrp.CFrame.LookVector)
+        d.Dir.Text = dir.." "..deg.."°"
+        d.Dir.Position = Vector2.new(x+w/2,y-80)
+        d.Dir.Visible = true
+
+        d.AltAGL.Text = "AGL "..getAltitudeAGL(hrp.Position)
+        d.AltAGL.Position = Vector2.new(x+w/2,y-100)
+        d.AltAGL.Visible = true
+
+        local camDist = math.floor((Camera.CFrame.Position - head.Position).Magnitude)
+        d.Distance.Text = "Cam "..camDist.." st"
+        d.Distance.Position = Vector2.new(x+w/2,y-120)
+        d.Distance.Visible = true
+
+        -- ===== NEW: distance to you =====
+        local myChar = LocalPlayer.Character
+        local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+
+        if myHRP then
+            local toMe = math.floor((myHRP.Position - hrp.Position).Magnitude)
+            d.ToMe.Text = "To Me "..toMe.." st"
+            d.ToMe.Position = Vector2.new(x+w/2,y-140)
+            d.ToMe.Visible = true
+        else
+            d.ToMe.Visible = false
+        end
+    end
+end)		setupCharacterRefresh(player)
+	end
+end
+
+Players.PlayerAdded:Connect(function(player)
+	if player ~= LocalPlayer then
+		setupCharacterRefresh(player)
+	end
+end)
+
+RunService.RenderStepped:Connect(function()
+	for _, player in ipairs(Players:GetPlayers()) do
+		if player == LocalPlayer then continue end
+
+		local char = player.Character
+		local head = char and char:FindFirstChild("Head")
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+		if not (head and hum and hrp and hum.Health > 0) then
+			if drawings[player] then
+				for _, obj in pairs(drawings[player]) do
+					obj.Visible = false
+				end
+			end
+			continue
+		end
+
+		local headCF = head.CFrame
+		local bodyCF, bodySize = char:GetBoundingBox()
+
+		local headSize = head.Size
+		local headCorners = {
+			headCF:PointToWorldSpace(Vector3.new(-headSize.X/2, -headSize.Y/2, -headSize.Z/2)),
+			headCF:PointToWorldSpace(Vector3.new(headSize.X/2, headSize.Y/2, headSize.Z/2))
+		}
+
+		local bodyCorners = {
+			bodyCF:PointToWorldSpace(Vector3.new(-bodySize.X/2, -bodySize.Y/2, -bodySize.Z/2)),
+			bodyCF:PointToWorldSpace(Vector3.new(bodySize.X/2, bodySize.Y/2, bodySize.Z/2))
+		}
+
+		local head1, headOn1 = Camera:WorldToViewportPoint(headCorners[1])
+		local head2, headOn2 = Camera:WorldToViewportPoint(headCorners[2])
+		local body1, bodyOn1 = Camera:WorldToViewportPoint(bodyCorners[1])
+		local body2, bodyOn2 = Camera:WorldToViewportPoint(bodyCorners[2])
+
+		if not (headOn1 and headOn2 and bodyOn1 and bodyOn2) then
+			if drawings[player] then
+				for _, obj in pairs(drawings[player]) do
+					obj.Visible = false
+				end
+			end
+			continue
+		end
+
+		if not drawings[player] then
+			drawings[player] = {
+				HeadBox = Drawing.new("Square"),
+				BodyBox = Drawing.new("Square"),
+				Name = Drawing.new("Text"),
+				Distance = Drawing.new("Text"),
+				HealthText = Drawing.new("Text"),
+				SpeedText = Drawing.new("Text"),
+				DirText = Drawing.new("Text")
+			}
+
+			for _, obj in pairs(drawings[player]) do
+				if obj.ClassName == "Text" then
+					obj.Size = 16
+					obj.Center = true
+					obj.Outline = true
+				elseif obj.ClassName == "Square" then
+					obj.Thickness = 2
+					obj.Filled = false
+					obj.Transparency = 1
+				end
+			end
+
+			drawings[player].HeadBox.Color = Color3.fromRGB(0, 150, 255) -- Blue
+			drawings[player].BodyBox.Color = Color3.fromRGB(255, 60, 60) -- Red
+			drawings[player].Name.Color = Color3.fromRGB(255, 255, 0)
+		end
+
+		local topLeftH, sizeH = getScreenBounds(head1, head2)
+		local topLeftB, sizeB = getScreenBounds(body1, body2)
+
+		local d = drawings[player]
+
+		d.HeadBox.Position = topLeftH
+		d.HeadBox.Size = sizeH
+		d.HeadBox.Visible = true
+
+		d.BodyBox.Position = topLeftB
+		d.BodyBox.Size = sizeB
+		d.BodyBox.Visible = true
+
+		d.Name.Text = player.Name
+		d.Name.Position = Vector2.new(topLeftH.X + sizeH.X / 2, topLeftH.Y - 18)
+		d.Name.Visible = true
+
+		local healthPerc = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+		d.HealthText.Text = "Health: " .. tostring(math.floor(healthPerc * 100))
+		d.HealthText.Color = getHealthColor(healthPerc)
+		d.HealthText.Position = Vector2.new(topLeftH.X + sizeH.X / 2, topLeftH.Y - 36)
+		d.HealthText.Visible = true
+
+		local velocity = hrp.AssemblyLinearVelocity.Magnitude
+		d.SpeedText.Text = "Speed: " .. tostring(math.floor(velocity))
+		d.SpeedText.Color = Color3.fromRGB(0, 200, 255)
+		d.SpeedText.Position = Vector2.new(topLeftH.X + sizeH.X / 2, topLeftH.Y - 54)
+		d.SpeedText.Visible = true
+
+		local dirStr, deg = getDirectionFromLook(hrp.CFrame.LookVector)
+		d.DirText.Text = "Direction: " .. dirStr .. " " .. string.format("%02d°", deg)
+		d.DirText.Color = Color3.fromRGB(180, 180, 255)
+		d.DirText.Position = Vector2.new(topLeftH.X + sizeH.X / 2, topLeftH.Y - 72)
+		d.DirText.Visible = true
+
+		local dist = math.floor((Camera.CFrame.Position - head.Position).Magnitude)
+		local result = Workspace:Raycast(Camera.CFrame.Position, (head.Position - Camera.CFrame.Position).Unit * 500)
+		local bgColor = result and result.Instance and result.Instance:IsA("BasePart") and result.Instance.Color or Color3.new(0, 0, 0)
+
+		d.Distance.Text = dist .. " studs"
+		d.Distance.Color = invertColor(bgColor)
+		d.Distance.Position = Vector2.new(topLeftB.X + sizeB.X / 2, topLeftB.Y + sizeB.Y + 2)
+		d.Distance.Visible = true
+	end
+
+	-- Update local player's HUD
+	if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+		local myHRP = LocalPlayer.Character.HumanoidRootPart
+		local myVelocity = myHRP.AssemblyLinearVelocity
+		local mySpeed = myVelocity.Magnitude
+		local dirStr, deg = getDirectionFromLook(myHRP.CFrame.LookVector)
+
+		topSpeedText.Text = "Speed: " .. math.floor(mySpeed)
+		topSpeedText.Visible = true
+
+		topDirText.Text = "Direction: " .. dirStr .. " (" .. math.floor(deg) .. "°)"
+		topDirText.Visible = true
+	else
+		topSpeedText.Visible = false
+		topDirText.Visible = false
+	end
+end)

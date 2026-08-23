@@ -1,0 +1,160 @@
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HRP = Character:WaitForChild("HumanoidRootPart")
+
+-- Variables
+local waypoints = {}
+local currentIndex = 0
+local noclipEnabled = false
+local minimized = false
+
+-- GUI Setup
+local gui = Instance.new("ScreenGui", game.CoreGui)
+gui.Name = "WaypointGUI"
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 300, 0, 210)
+frame.Position = UDim2.new(0.5, -150, 0.5, -105)
+frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+frame.Active = true
+frame.Draggable = true
+
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Text = "🌍 Waypoint Manager"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 20
+
+local toggleButton = Instance.new("TextButton", frame)
+toggleButton.Size = UDim2.new(0, 30, 0, 30)
+toggleButton.Position = UDim2.new(1, -30, 0, 0)
+toggleButton.Text = "🗕"
+toggleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+toggleButton.TextColor3 = Color3.new(1, 1, 1)
+toggleButton.BorderSizePixel = 0
+
+local setButton = Instance.new("TextButton", frame)
+setButton.Size = UDim2.new(1, -20, 0, 30)
+setButton.Position = UDim2.new(0, 10, 0, 35)
+setButton.Text = "📍 Set Waypoint"
+setButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+setButton.TextColor3 = Color3.new(1, 1, 1)
+
+local indexLabel = Instance.new("TextLabel", frame)
+indexLabel.Size = UDim2.new(1, -20, 0, 25)
+indexLabel.Position = UDim2.new(0, 10, 0, 70)
+indexLabel.Text = "No waypoints"
+indexLabel.BackgroundTransparency = 1
+indexLabel.TextColor3 = Color3.new(1, 1, 1)
+
+local leftButton = Instance.new("TextButton", frame)
+leftButton.Size = UDim2.new(0, 40, 0, 30)
+leftButton.Position = UDim2.new(0, 10, 0, 100)
+leftButton.Text = "<<"
+leftButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+leftButton.TextColor3 = Color3.new(1, 1, 1)
+
+local rightButton = Instance.new("TextButton", frame)
+rightButton.Size = UDim2.new(0, 40, 0, 30)
+rightButton.Position = UDim2.new(0, 60, 0, 100)
+rightButton.Text = ">>"
+rightButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+rightButton.TextColor3 = Color3.new(1, 1, 1)
+
+local teleportButton = Instance.new("TextButton", frame)
+teleportButton.Size = UDim2.new(0, 170, 0, 30)
+teleportButton.Position = UDim2.new(0, 110, 0, 100)
+teleportButton.Text = "🚀 Teleport to Waypoint"
+teleportButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+teleportButton.TextColor3 = Color3.new(1, 1, 1)
+
+local removeButton = Instance.new("TextButton", frame)
+removeButton.Size = UDim2.new(1, -20, 0, 30)
+removeButton.Position = UDim2.new(0, 10, 0, 140)
+removeButton.Text = "❌ Remove Waypoint"
+removeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+removeButton.TextColor3 = Color3.new(1, 1, 1)
+
+local noclipButton = Instance.new("TextButton", frame)
+noclipButton.Size = UDim2.new(1, -20, 0, 30)
+noclipButton.Position = UDim2.new(0, 10, 0, 175)
+noclipButton.Text = "🛸 Noclip: OFF"
+noclipButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+noclipButton.TextColor3 = Color3.new(1, 1, 1)
+
+-- Noclip logic
+RunService.Stepped:Connect(function()
+    if noclipEnabled and Character then
+        for _, v in ipairs(Character:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = false
+            end
+        end
+    end
+end)
+
+-- Minimize / Maximize toggle
+toggleButton.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    toggleButton.Text = minimized and "🗖" or "🗕"
+    for _, child in ipairs(frame:GetChildren()) do
+        if child ~= title and child ~= toggleButton then
+            child.Visible = not minimized
+        end
+    end
+    frame.Size = minimized and UDim2.new(0, 300, 0, 30) or UDim2.new(0, 300, 0, 210)
+end)
+
+-- Button Functions
+setButton.MouseButton1Click:Connect(function()
+    if HRP then
+        table.insert(waypoints, HRP.Position)
+        currentIndex = #waypoints
+        indexLabel.Text = "Waypoint " .. currentIndex .. "/" .. #waypoints
+    end
+end)
+
+leftButton.MouseButton1Click:Connect(function()
+    if #waypoints > 0 then
+        currentIndex = currentIndex - 1
+        if currentIndex < 1 then currentIndex = #waypoints end
+        indexLabel.Text = "Waypoint " .. currentIndex .. "/" .. #waypoints
+    end
+end)
+
+rightButton.MouseButton1Click:Connect(function()
+    if #waypoints > 0 then
+        currentIndex = currentIndex + 1
+        if currentIndex > #waypoints then currentIndex = 1 end
+        indexLabel.Text = "Waypoint " .. currentIndex .. "/" .. #waypoints
+    end
+end)
+
+teleportButton.MouseButton1Click:Connect(function()
+    if HRP and waypoints[currentIndex] then
+        HRP.CFrame = CFrame.new(waypoints[currentIndex])
+    end
+end)
+
+removeButton.MouseButton1Click:Connect(function()
+    if #waypoints > 0 and currentIndex > 0 then
+        table.remove(waypoints, currentIndex)
+        if #waypoints == 0 then
+            currentIndex = 0
+            indexLabel.Text = "No waypoints"
+        else
+            if currentIndex > #waypoints then currentIndex = #waypoints end
+            indexLabel.Text = "Waypoint " .. currentIndex .. "/" .. #waypoints
+        end
+    end
+end)
+
+noclipButton.MouseButton1Click:Connect(function()
+    noclipEnabled = not noclipEnabled
+    noclipButton.Text = noclipEnabled and "🛸 Noclip: ON" or "🛸 Noclip: OFF"
+end)

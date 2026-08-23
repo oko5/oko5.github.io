@@ -1,0 +1,164 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+
+-- ================= CHARACTER =================
+local character = player.Character or player.CharacterAdded:Wait()
+local root = character:WaitForChild("HumanoidRootPart")
+local humanoid = character:WaitForChild("Humanoid")
+
+humanoid.WalkSpeed = 0
+humanoid.JumpPower = 0
+humanoid.AutoRotate = false
+
+-- ================= GUI =================
+local gui = Instance.new("ScreenGui")
+gui.Name = "ForceAccelGUI"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 240, 0, 200)
+frame.Position = UDim2.new(0.5, -120, 0.8, -100)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.Active = true
+frame.Draggable = true
+frame.Parent = gui
+
+-- ================= TITLE BAR (WINDOW STYLE) =================
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1, 0, 0, 28)
+titleBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+titleBar.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -60, 1, 0)
+title.Position = UDim2.new(0, 8, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "Force Accel"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = titleBar
+
+-- ================= MINIMIZE BUTTON (WINDOW STYLE) =================
+local minimized = false
+
+local minBtn = Instance.new("TextButton")
+minBtn.Size = UDim2.new(0, 28, 0, 22)
+minBtn.Position = UDim2.new(1, -60, 0, 3)
+minBtn.Text = "—"
+minBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+minBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+minBtn.Parent = titleBar
+
+-- ================= CONTENT HOLDER =================
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1, 0, 1, -28)
+content.Position = UDim2.new(0, 0, 0, 28)
+content.BackgroundTransparency = 1
+content.Parent = frame
+
+-- ================= INPUTS =================
+local speedBox = Instance.new("TextBox")
+speedBox.Size = UDim2.new(1, -20, 0, 40)
+speedBox.Position = UDim2.new(0, 10, 0, 10)
+speedBox.PlaceholderText = "Target Speed"
+speedBox.TextColor3 = Color3.fromRGB(255,255,255)
+speedBox.BackgroundColor3 = Color3.fromRGB(45,45,45)
+speedBox.Parent = content
+
+local angleBox = Instance.new("TextBox")
+angleBox.Size = UDim2.new(1, -20, 0, 40)
+angleBox.Position = UDim2.new(0, 10, 0, 55)
+angleBox.PlaceholderText = "Direction (-360 to 360)"
+angleBox.Text = "0"
+angleBox.TextColor3 = Color3.fromRGB(255,255,255)
+angleBox.BackgroundColor3 = Color3.fromRGB(45,45,45)
+angleBox.Parent = content
+
+local toggle = Instance.new("TextButton")
+toggle.Size = UDim2.new(1, -20, 0, 40)
+toggle.Position = UDim2.new(0, 10, 0, 100)
+toggle.Text = "OFF"
+toggle.BackgroundColor3 = Color3.fromRGB(170,60,60)
+toggle.TextColor3 = Color3.fromRGB(255,255,255)
+toggle.Parent = content
+
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1, -20, 0, 30)
+label.Position = UDim2.new(0, 10, 0, 145)
+label.BackgroundTransparency = 1
+label.TextColor3 = Color3.fromRGB(255,255,255)
+label.Text = "Override Disabled"
+label.Parent = content
+
+-- ================= MINIMIZE LOGIC =================
+minBtn.MouseButton1Click:Connect(function()
+	minimized = not minimized
+
+	content.Visible = not minimized
+	frame.Size = minimized and UDim2.new(0, 240, 0, 28) or UDim2.new(0, 240, 0, 200)
+end)
+
+-- ================= VARIABLES =================
+local enabled = false
+local targetSpeed = 0
+local currentSpeed = 0
+local acceleration = 3
+local angle = 0
+
+speedBox.FocusLost:Connect(function()
+	local v = tonumber(speedBox.Text)
+	if v then targetSpeed = v end
+end)
+
+angleBox.FocusLost:Connect(function()
+	local v = tonumber(angleBox.Text)
+	if v then angle = math.clamp(v, -360, 360) end
+end)
+
+toggle.MouseButton1Click:Connect(function()
+	enabled = not enabled
+
+	if enabled then
+		toggle.Text = "ON"
+		toggle.BackgroundColor3 = Color3.fromRGB(60,170,60)
+		label.Text = "Override ACTIVE"
+	else
+		toggle.Text = "OFF"
+		toggle.BackgroundColor3 = Color3.fromRGB(170,60,60)
+		label.Text = "Override Disabled"
+		currentSpeed = 0
+	end
+end)
+
+-- ================= FORCE ACCELERATION =================
+RunService.RenderStepped:Connect(function()
+	if not enabled or not root then return end
+
+	local rad = math.rad(angle)
+	local dir = Vector3.new(math.sin(rad), 0, math.cos(rad))
+
+	currentSpeed = math.min(currentSpeed + acceleration, targetSpeed)
+
+	root.AssemblyLinearVelocity = Vector3.new(
+		dir.X * currentSpeed,
+		root.AssemblyLinearVelocity.Y,
+		dir.Z * currentSpeed
+	)
+end)
+
+-- ================= RESET =================
+player.CharacterAdded:Connect(function(char)
+	character = char
+	root = char:WaitForChild("HumanoidRootPart")
+	humanoid = char:WaitForChild("Humanoid")
+
+	humanoid.WalkSpeed = 0
+	humanoid.JumpPower = 0
+	humanoid.AutoRotate = false
+
+	currentSpeed = 0
+	enabled = false
+end)

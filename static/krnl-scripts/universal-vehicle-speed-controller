@@ -1,0 +1,192 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- ================= MAIN GUI =================
+local gui = Instance.new("ScreenGui")
+gui.Name = "VehiclePhysicsEngine"
+gui.ResetOnSpawn = false
+gui.Parent = PlayerGui
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 240, 0, 270)
+frame.Position = UDim2.new(0.5, -120, 0.5, -135)
+frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = gui
+
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+
+-- ================= TOP BAR =================
+local topBar = Instance.new("Frame")
+topBar.Size = UDim2.new(1,0,0,25)
+topBar.BackgroundColor3 = Color3.fromRGB(35,35,35)
+topBar.BorderSizePixel = 0
+topBar.Active = true
+topBar.Draggable = true
+topBar.Parent = frame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,0,1,0)
+title.BackgroundTransparency = 1
+title.Text = "Vehicle Engine Controller"
+title.TextColor3 = Color3.fromRGB(255,255,255)
+title.Font = Enum.Font.SourceSansBold
+title.TextSize = 14
+title.Parent = topBar
+
+-- ================= SPEED INPUT =================
+local speedBox = Instance.new("TextBox")
+speedBox.Size = UDim2.new(1,-20,0,30)
+speedBox.Position = UDim2.new(0,10,0,35)
+speedBox.PlaceholderText = "Max Speed"
+speedBox.Text = "120"
+speedBox.TextColor3 = Color3.fromRGB(255,255,255)
+speedBox.BackgroundColor3 = Color3.fromRGB(40,40,40)
+speedBox.Parent = frame
+
+-- ================= ACCELERATION INPUT =================
+local accelBox = Instance.new("TextBox")
+accelBox.Size = UDim2.new(1,-20,0,30)
+accelBox.Position = UDim2.new(0,10,0,70)
+accelBox.PlaceholderText = "Acceleration Gain / sec"
+accelBox.Text = "1.8"
+accelBox.TextColor3 = Color3.fromRGB(255,255,255)
+accelBox.BackgroundColor3 = Color3.fromRGB(40,40,40)
+accelBox.Parent = frame
+
+-- ================= DIRECTION CORRECTOR =================
+local dirBox = Instance.new("TextBox")
+dirBox.Size = UDim2.new(1,-20,0,30)
+dirBox.Position = UDim2.new(0,10,0,105)
+dirBox.PlaceholderText = "Direction Corrector (Degrees)"
+dirBox.Text = "0"
+dirBox.TextColor3 = Color3.fromRGB(255,255,255)
+dirBox.BackgroundColor3 = Color3.fromRGB(40,40,40)
+dirBox.Parent = frame
+
+-- ================= STATE =================
+local enabled = false
+local holding = false
+local enginePower = 0
+local decayRate = 2.5
+
+-- ================= TOGGLE =================
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(1,-20,0,30)
+toggleBtn.Position = UDim2.new(0,10,0,145)
+toggleBtn.Text = "OFF"
+toggleBtn.TextColor3 = Color3.fromRGB(255,255,255)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(120,40,40)
+toggleBtn.Parent = frame
+
+toggleBtn.MouseButton1Click:Connect(function()
+	enabled = not enabled
+	toggleBtn.Text = enabled and "ON" or "OFF"
+	toggleBtn.BackgroundColor3 = enabled and Color3.fromRGB(40,120,40) or Color3.fromRGB(120,40,40)
+end)
+
+-- ================= HOLD BUTTON =================
+local holdGui = Instance.new("ScreenGui")
+holdGui.Name = "DriveHoldButton"
+holdGui.ResetOnSpawn = false
+holdGui.Parent = PlayerGui
+
+local goBtn = Instance.new("TextButton")
+goBtn.Size = UDim2.new(0, 160, 0, 45)
+goBtn.Position = UDim2.new(0.5, -80, 0.8, 0)
+goBtn.Text = "HOLD TO DRIVE"
+goBtn.TextColor3 = Color3.fromRGB(255,255,255)
+goBtn.BackgroundColor3 = Color3.fromRGB(40,120,40)
+goBtn.Active = true
+goBtn.Draggable = true
+goBtn.Parent = holdGui
+
+goBtn.MouseButton1Down:Connect(function()
+	holding = true
+end)
+
+goBtn.MouseButton1Up:Connect(function()
+	holding = false
+end)
+
+-- ================= VEHICLE =================
+local function getSeat()
+	local char = LocalPlayer.Character
+	if not char then return nil end
+
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not hum then return nil end
+
+	return hum.SeatPart
+end
+
+local function getRoot(seat)
+	local model = seat:FindFirstAncestorOfClass("Model")
+	if not model then return nil end
+	return model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart or seat
+end
+
+RunService.RenderStepped:Connect(function(dt)
+	if not enabled then return end
+
+	local seat = getSeat()
+	if not seat then return end
+
+	local root = getRoot(seat)
+	if not root then return end
+
+	local maxSpeed = tonumber(speedBox.Text) or 120
+	local accelRate = tonumber(accelBox.Text) or 1.8
+	local dirOffsetDeg = tonumber(dirBox.Text) or 0
+
+	-- ================= ENGINE POWER =================
+	if holding then
+		enginePower = math.min(1, enginePower + accelRate * dt)
+	else
+		enginePower = math.max(0, enginePower - decayRate * dt)
+	end
+
+	-- ================= FORCE SETUP =================
+	local att = root:FindFirstChild("EngineAttachment")
+	if not att then
+		att = Instance.new("Attachment")
+		att.Name = "EngineAttachment"
+		att.Parent = root
+	end
+
+	local vf = root:FindFirstChild("EngineForce")
+	if not vf then
+		vf = Instance.new("VectorForce")
+		vf.Name = "EngineForce"
+		vf.Attachment0 = att
+		vf.RelativeTo = Enum.ActuatorRelativeTo.World
+		vf.ApplyAtCenterOfMass = true
+		vf.Parent = root
+	end
+
+	local velocity = root.AssemblyLinearVelocity
+	local forward = root.CFrame.LookVector
+
+	-- ================= DIRECTION CORRECTION =================
+	local angle = math.rad(dirOffsetDeg)
+	local correctedForward = (CFrame.Angles(0, angle, 0):VectorToWorldSpace(forward)).Unit
+
+	local currentSpeed = velocity:Dot(correctedForward)
+	local mass = root.AssemblyMass
+
+	-- engine force
+	local engineForce = correctedForward * enginePower * accelRate * mass * 60
+
+	-- ================= SPEED LIMIT =================
+	if currentSpeed >= maxSpeed then
+		engineForce = Vector3.zero
+	end
+
+	vf.Force = engineForce
+end)

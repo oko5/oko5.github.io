@@ -1,0 +1,191 @@
+-- LocalScript inside StarterGui
+
+local Players = game:GetService("Players")
+local localPlayer = Players.LocalPlayer
+
+-- GUI Setup
+local screenGui = Instance.new("ScreenGui", localPlayer:WaitForChild("PlayerGui"))
+screenGui.Name = "KRNLInventoryUI"
+screenGui.ResetOnSpawn = false
+
+-- Main Frame
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 520, 0, 260)
+mainFrame.Position = UDim2.new(0.5, -260, 0.5, -130)
+mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+
+-- Minimize Button
+local minimizeButton = Instance.new("TextButton")
+minimizeButton.Size = UDim2.new(0, 24, 0, 24)
+minimizeButton.Position = UDim2.new(1, -28, 0, 4)
+minimizeButton.Text = "-"
+minimizeButton.TextSize = 18
+minimizeButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+minimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+minimizeButton.BorderSizePixel = 0
+minimizeButton.Parent = mainFrame
+
+-- Username TextBox
+local nameBox = Instance.new("TextBox")
+nameBox.Size = UDim2.new(0, 200, 0, 26)
+nameBox.Position = UDim2.new(0, 10, 0, 10)
+nameBox.PlaceholderText = "Username"
+nameBox.Text = ""
+nameBox.TextSize = 14
+nameBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+nameBox.TextColor3 = Color3.fromRGB(0, 0, 0)
+nameBox.BorderSizePixel = 0
+nameBox.ClearTextOnFocus = false
+nameBox.Parent = mainFrame
+
+-- Dropdown Button
+local dropdown = Instance.new("TextButton")
+dropdown.Size = UDim2.new(0, 120, 0, 26)
+dropdown.Position = UDim2.new(0, 220, 0, 10)
+dropdown.Text = "Backpack ▼"
+dropdown.TextSize = 14
+dropdown.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+dropdown.TextColor3 = Color3.new(1, 1, 1)
+dropdown.BorderSizePixel = 0
+dropdown.Parent = mainFrame
+
+local currentSelection = "Backpack"
+dropdown.MouseButton1Click:Connect(function()
+	if currentSelection == "Backpack" then
+		currentSelection = "Equipped"
+		dropdown.Text = "Equipped ▼"
+	else
+		currentSelection = "Backpack"
+		dropdown.Text = "Backpack ▼"
+	end
+end)
+
+-- Check Button
+local checkButton = Instance.new("TextButton")
+checkButton.Size = UDim2.new(0, 80, 0, 26)
+checkButton.Position = UDim2.new(0, 350, 0, 10)
+checkButton.Text = "Check"
+checkButton.TextSize = 14
+checkButton.BackgroundColor3 = Color3.fromRGB(60, 180, 75)
+checkButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+checkButton.BorderSizePixel = 0
+checkButton.Parent = mainFrame
+
+-- Inventory Display Frame (Vertical)
+local scrollFrame = Instance.new("ScrollingFrame")
+scrollFrame.Size = UDim2.new(1, -20, 1, -50)
+scrollFrame.Position = UDim2.new(0, 10, 0, 45)
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollFrame.ScrollBarThickness = 8
+scrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+scrollFrame.BackgroundColor3 = Color3.fromRGB(240, 240, 240)
+scrollFrame.BorderSizePixel = 0
+scrollFrame.Parent = mainFrame
+
+-- Vertical List Layout
+local layout = Instance.new("UIListLayout", scrollFrame)
+layout.FillDirection = Enum.FillDirection.Vertical
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Padding = UDim.new(0, 4)
+
+-- Auto-update scroll size
+layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+end)
+
+-- Clear Items
+local function clearItems()
+	for _, child in pairs(scrollFrame:GetChildren()) do
+		if child:IsA("TextLabel") then
+			child:Destroy()
+		end
+	end
+end
+
+-- Inventory Display
+local function displayInventory(username, source)
+	clearItems()
+
+	local target = Players:FindFirstChild(username)
+	if not target then
+		local label = Instance.new("TextLabel", scrollFrame)
+		label.Text = "❌ Player not found."
+		label.Size = UDim2.new(1, 0, 0, 20)
+		label.TextSize = 12
+		label.BackgroundTransparency = 1
+		label.TextColor3 = Color3.new(1, 0, 0)
+		return
+	end
+
+	local container = (source == "Backpack") and target:FindFirstChild("Backpack") or target.Character
+
+	if not container then
+		local label = Instance.new("TextLabel", scrollFrame)
+		label.Text = "⚠️ Cannot access " .. source
+		label.Size = UDim2.new(1, 0, 0, 20)
+		label.TextSize = 12
+		label.BackgroundTransparency = 1
+		label.TextColor3 = Color3.fromRGB(255, 150, 0)
+		return
+	end
+
+	local toolsFound = false
+	for _, item in pairs(container:GetChildren()) do
+		if item:IsA("Tool") then
+			toolsFound = true
+			local label = Instance.new("TextLabel", scrollFrame)
+			label.Size = UDim2.new(1, 0, 0, 20)
+			label.Text = "🔹 " .. item.Name
+			label.TextSize = 12
+			label.BackgroundTransparency = 1
+			label.TextColor3 = Color3.new(0, 0, 0)
+			label.TextXAlignment = Enum.TextXAlignment.Left
+		end
+	end
+
+	if not toolsFound then
+		for i = 1, 10 do
+			local label = Instance.new("TextLabel", scrollFrame)
+			label.Size = UDim2.new(1, 0, 0, 20)
+			label.Text = "🔹 FakeTool" .. i
+			label.TextSize = 12
+			label.BackgroundTransparency = 1
+			label.TextColor3 = Color3.new(0.5, 0.5, 0.5)
+			label.TextXAlignment = Enum.TextXAlignment.Left
+		end
+	end
+end
+
+-- Check Inventory Click
+checkButton.MouseButton1Click:Connect(function()
+	local username = nameBox.Text
+	if username ~= "" then
+		displayInventory(username, currentSelection)
+	end
+end)
+
+-- Minimize Toggle
+local minimized = false
+minimizeButton.MouseButton1Click:Connect(function()
+	minimized = not minimized
+
+	if minimized then
+		mainFrame.Size = UDim2.new(0, 150, 0, 30)
+		nameBox.Visible = false
+		dropdown.Visible = false
+		checkButton.Visible = false
+		scrollFrame.Visible = false
+	else
+		mainFrame.Size = UDim2.new(0, 520, 0, 260)
+		nameBox.Visible = true
+		dropdown.Visible = true
+		checkButton.Visible = true
+		scrollFrame.Visible = true
+	end
+end)

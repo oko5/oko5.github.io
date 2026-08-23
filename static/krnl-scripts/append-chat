@@ -1,0 +1,149 @@
+-- CUSTOM CHAT GUI (Safe Edition With 11-Character Random Code)
+-- Inserts text into real Roblox chat on Enter key
+-- No button, textbox clears after inserting
+
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- Wait for PlayerGui
+repeat task.wait() until player:FindFirstChild("PlayerGui")
+local playerGui = player.PlayerGui
+
+-- Remove previous GUI
+local existing = playerGui:FindFirstChild("CustomChatGUI")
+if existing then existing:Destroy() end
+
+-- GUI Setup
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CustomChatGUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 300, 0, 150)
+mainFrame.Position = UDim2.new(0, 50, 0, 50)
+mainFrame.BackgroundColor3 = Color3.fromRGB(45,45,45)
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.Parent = screenGui
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0,8)
+
+local titleBar = Instance.new("Frame")
+titleBar.Size = UDim2.new(1,0,0,30)
+titleBar.BackgroundColor3 = Color3.fromRGB(35,35,35)
+titleBar.Parent = mainFrame
+Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0,8)
+
+local titleText = Instance.new("TextLabel")
+titleText.Size = UDim2.new(0.7,0,1,0)
+titleText.Position = UDim2.new(0,10,0,0)
+titleText.BackgroundTransparency = 1
+titleText.Text = "Custom Chat"
+titleText.TextColor3 = Color3.new(1,1,1)
+titleText.Font = Enum.Font.Gotham
+titleText.TextSize = 14
+titleText.TextXAlignment = Enum.TextXAlignment.Left
+titleText.Parent = titleBar
+
+local close = Instance.new("TextButton")
+close.Size = UDim2.new(0,30,0,30)
+close.Position = UDim2.new(1,-30,0,0)
+close.BackgroundColor3 = Color3.fromRGB(200,60,60)
+close.Text = "X"
+close.TextColor3 = Color3.new(1,1,1)
+close.Font = Enum.Font.GothamBold
+close.TextSize = 14
+close.Parent = titleBar
+Instance.new("UICorner", close).CornerRadius = UDim.new(0,8)
+
+local content = Instance.new("Frame")
+content.Size = UDim2.new(1,-20,1,-40)
+content.Position = UDim2.new(0,10,0,40)
+content.BackgroundTransparency = 1
+content.Parent = mainFrame
+
+local textBox = Instance.new("TextBox")
+textBox.Size = UDim2.new(1,0,0,100)
+textBox.BackgroundColor3 = Color3.fromRGB(65,65,65)
+textBox.Text = ""
+textBox.PlaceholderText = "Type your message here..."
+textBox.TextColor3 = Color3.new(1,1,1)
+textBox.Font = Enum.Font.Gotham
+textBox.TextSize = 14
+textBox.ClearTextOnFocus = false
+textBox.MultiLine = false -- no new lines
+textBox.TextWrapped = true
+textBox.Parent = content
+Instance.new("UICorner", textBox).CornerRadius = UDim.new(0,6)
+
+local shadow = Instance.new("UIStroke")
+shadow.Color = Color3.new(0,0,0)
+shadow.Thickness = 2
+shadow.Parent = mainFrame
+
+-------------------------------------------------------------------
+-- Generate 11-character random code
+-------------------------------------------------------------------
+local function generateRandomCode()
+    local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*"
+    local out = ""
+    for i = 1, 11 do
+        local index = math.random(1, #chars)
+        out = out .. chars:sub(index, index)
+    end
+    return out
+end
+
+-------------------------------------------------------------------
+-- Find REAL Roblox chat textbox
+-------------------------------------------------------------------
+local function findRealChatBox()
+    local core = game:GetService("CoreGui")
+    for _, obj in ipairs(core:GetDescendants()) do
+        if obj:IsA("TextBox") and obj.Visible and obj.PlaceholderText ~= "" then
+            return obj
+        end
+    end
+    return nil
+end
+
+-------------------------------------------------------------------
+-- Insert formatted message into real chat textbox
+-------------------------------------------------------------------
+local function insertIntoRealChat()
+    local msg = textBox.Text
+    if msg == "" then return end
+
+    local code = generateRandomCode()
+    local formatted = msg .. " | [" .. code .. "]"
+
+    local realChat = findRealChatBox()
+    if realChat then
+        realChat.Text = formatted
+        realChat:CaptureFocus()
+        print("Inserted into chat: " .. formatted)
+        textBox.Text = "" -- clear after inserting
+    else
+        warn("Could not find real chat textbox.")
+    end
+end
+
+-------------------------------------------------------------------
+-- Press Enter to send
+-------------------------------------------------------------------
+textBox.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        task.defer(insertIntoRealChat) -- defer ensures TextBox.Text is fully updated
+    end
+end)
+
+-------------------------------------------------------------------
+-- Close GUI
+-------------------------------------------------------------------
+close.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
+
+print("Custom Chat GUI Loaded (Format Mode)")
+print("Message will be inserted as: <text> | [11-char code]")
+print("Press Enter to insert into chat.")

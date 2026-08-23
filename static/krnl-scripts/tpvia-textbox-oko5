@@ -1,0 +1,176 @@
+-- Wait for player
+repeat task.wait() until game.Players.LocalPlayer
+
+local player = game.Players.LocalPlayer
+
+-- Create ScreenGui
+local gui = Instance.new("ScreenGui")
+gui.Name = "PositionGUI"
+gui.Parent = player:WaitForChild("PlayerGui")
+
+-- Main Frame
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 180, 0, 130)
+frame.Position = UDim2.new(0, 20, 0, 20)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = gui
+
+-- Title
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -20, 0, 20)
+title.Position = UDim2.new(0, 5, 0, 0)
+title.Text = "XYZ"
+title.TextColor3 = Color3.new(1,1,1)
+title.BackgroundTransparency = 1
+title.TextSize = 14
+title.Parent = frame
+
+-- Minimize Button
+local minimize = Instance.new("TextButton")
+minimize.Size = UDim2.new(0, 20, 0, 20)
+minimize.Position = UDim2.new(1, -20, 0, 0)
+minimize.Text = "-"
+minimize.TextColor3 = Color3.new(1,1,1)
+minimize.BackgroundColor3 = Color3.fromRGB(50,50,50)
+minimize.Parent = frame
+
+-- Position Label
+local posLabel = Instance.new("TextLabel")
+posLabel.Size = UDim2.new(1, -10, 0, 20)
+posLabel.Position = UDim2.new(0, 5, 0, 25)
+posLabel.Text = "[0, 0, 0]"
+posLabel.TextColor3 = Color3.new(1,1,1)
+posLabel.BackgroundTransparency = 1
+posLabel.TextSize = 12
+posLabel.Parent = frame
+
+-- Copy Button
+local copyBtn = Instance.new("TextButton")
+copyBtn.Size = UDim2.new(0.48, -5, 0, 20)
+copyBtn.Position = UDim2.new(0, 5, 0, 45)
+copyBtn.Text = "Copy"
+copyBtn.TextColor3 = Color3.new(1,1,1)
+copyBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+copyBtn.TextSize = 12
+copyBtn.Parent = frame
+
+-- TP Button
+local tpBtn = Instance.new("TextButton")
+tpBtn.Size = UDim2.new(0.48, -5, 0, 20)
+tpBtn.Position = UDim2.new(0.52, 0, 0, 45)
+tpBtn.Text = "TP"
+tpBtn.TextColor3 = Color3.new(1,1,1)
+tpBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+tpBtn.TextSize = 12
+tpBtn.Parent = frame
+
+-- Input Box
+local input = Instance.new("TextBox")
+input.Size = UDim2.new(1, -10, 0, 20)
+input.Position = UDim2.new(0, 5, 0, 70)
+input.PlaceholderText = "[x, y, z]"
+input.Text = ""
+input.TextColor3 = Color3.new(1,1,1)
+input.BackgroundColor3 = Color3.fromRGB(40,40,40)
+input.TextSize = 12
+input.Parent = frame
+
+-- Loop TP Button
+local loopBtn = Instance.new("TextButton")
+loopBtn.Size = UDim2.new(1, -10, 0, 20)
+loopBtn.Position = UDim2.new(0, 5, 0, 95)
+loopBtn.Text = "Loop TP: OFF"
+loopBtn.TextColor3 = Color3.new(1,1,1)
+loopBtn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+loopBtn.TextSize = 12
+loopBtn.Parent = frame
+
+-- Variables
+local minimized = false
+local loopTP = false
+local targetPos = nil
+
+-- Minimize
+minimize.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    
+    posLabel.Visible = not minimized
+    copyBtn.Visible = not minimized
+    tpBtn.Visible = not minimized
+    input.Visible = not minimized
+    loopBtn.Visible = not minimized
+
+    frame.Size = minimized and UDim2.new(0, 180, 0, 20) or UDim2.new(0, 180, 0, 130)
+    minimize.Text = minimized and "+" or "-"
+end)
+
+-- Update position + loop TP
+game:GetService("RunService").RenderStepped:Connect(function()
+    local char = player.Character
+    if not char then return end
+
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local pos = hrp.Position
+    posLabel.Text = string.format("[%.2f, %.2f, %.2f]", pos.X, pos.Y, pos.Z)
+
+    if loopTP and targetPos then
+        hrp.CFrame = CFrame.new(targetPos)
+    end
+end)
+
+-- Copy
+copyBtn.MouseButton1Click:Connect(function()
+    local char = player.Character
+    if not char then return end
+
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local pos = hrp.Position
+    local text = string.format("[%.2f, %.2f, %.2f]", pos.X, pos.Y, pos.Z)
+
+    if setclipboard then
+        setclipboard(text)
+    end
+end)
+
+-- Teleport once
+tpBtn.MouseButton1Click:Connect(function()
+    local text = input.Text
+    local x, y, z = text:match("%[?%s*(-?[%d%.]+)%s*,%s*(-?[%d%.]+)%s*,%s*(-?[%d%.]+)%s*%]?")
+
+    if x and y and z then
+        local char = player.Character
+        if not char then return end
+
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+
+        hrp.CFrame = CFrame.new(tonumber(x), tonumber(y), tonumber(z))
+    end
+end)
+
+-- Loop TP toggle
+loopBtn.MouseButton1Click:Connect(function()
+    loopTP = not loopTP
+
+    if loopTP then
+        local text = input.Text
+        local x, y, z = text:match("%[?%s*(-?[%d%.]+)%s*,%s*(-?[%d%.]+)%s*,%s*(-?[%d%.]+)%s*%]?")
+
+        if x and y and z then
+            targetPos = Vector3.new(tonumber(x), tonumber(y), tonumber(z))
+            loopBtn.Text = "Loop TP: ON"
+        else
+            loopTP = false
+            loopBtn.Text = "Loop TP: OFF"
+        end
+    else
+        loopBtn.Text = "Loop TP: OFF"
+    end
+end)
