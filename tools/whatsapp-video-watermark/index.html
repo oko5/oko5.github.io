@@ -1,0 +1,1459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blur + Watermark Image Tool</title>
+
+<style>
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        min-height
+        : 100vh;
+        font-family: Arial, Helvetica, sans-serif;
+        background: #111;
+        color: #eee;
+        display: flex;
+        justify-content: center;
+        padding: 30px 15px;
+    }
+
+    .container {
+        width: 100%;
+        max-width: 1000px;
+    }
+
+    h1 {
+        margin-top: 0;
+        text-align: center;
+        font-size: 28px;
+    }
+
+    .panel {
+        background: #1d1d1d;
+        border: 1px solid #333;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+
+    .upload-area {
+        border: 2px dashed #555;
+        border-radius: 10px;
+        padding: 30px;
+        text-align: center;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+
+    .upload-area:hover {
+        border-color: #999;
+        background: #242424;
+    }
+
+    #fileInput {
+        display: none;
+    }
+
+    .controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        align-items: center;
+    }
+
+    .control {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    label {
+        font-weight: bold;
+    }
+
+    input[type="range"] {
+        width: 100%;
+    }
+
+    input[type="text"] {
+        width: 100%;
+        padding: 11px 12px;
+        border: 1px solid #444;
+        border-radius: 8px;
+        background: #111;
+        color: #fff;
+        font-size: 15px;
+        outline: none;
+    }
+
+    input[type="text"]:focus {
+        border-color: #777;
+    }
+
+    .scale-value {
+        font-size: 18px;
+        font-weight: bold;
+    }
+
+    .checkbox {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 20px;
+    }
+
+    .checkbox input {
+        width: 18px;
+        height: 18px;
+    }
+
+    button {
+        border: 0;
+        border-radius: 8px;
+        padding: 12px 20px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        margin-right: 10px;
+        margin-top: 20px;
+    }
+
+    #previewBtn {
+        background: #4c8bf5;
+        color: white;
+    }
+
+    #downloadBtn {
+        background: #38a169;
+        color: white;
+    }
+
+    button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    .preview-wrapper {
+        background:
+            repeating-conic-gradient(#222 0% 25%, #292929 0% 50%)
+            50% / 20px 20px;
+        border-radius: 10px;
+        padding: 15px;
+        overflow: auto;
+        text-align: center;
+        min-height: 150px;
+    }
+
+    canvas {
+        max-width: 100%;
+        height: auto;
+        display: block;
+        margin: auto;
+    }
+
+    .info {
+        color: #aaa;
+        font-size: 13px;
+        line-height: 1.5;
+        margin-top: 15px;
+    }
+
+    @media (max-width: 700px) {
+        .controls {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Blur + Watermark Image Tool</h1>
+
+    <div class="panel">
+
+        <div class="upload-area" id="uploadArea">
+
+            <strong>
+                Click here to upload an image
+            </strong>
+
+            <br>
+
+            <small>
+                PNG, JPG, WEBP, etc.
+            </small>
+
+            <input
+                type="file"
+                id="fileInput"
+                accept="image/*"
+            >
+
+        </div>
+
+
+        <div
+            class="controls"
+            style="margin-top: 20px;"
+        >
+
+            <!-- SCALE -->
+
+            <div class="control">
+
+                <label for="scaleRange">
+                    Preview / Download Scale
+                </label>
+
+                <input
+                    type="range"
+                    id="scaleRange"
+                    min="0"
+                    max="100"
+                    value="100"
+                    step="1"
+                >
+
+                <div class="scale-value">
+
+                    <span id="scaleValue">
+                        100
+                    </span>%
+
+                </div>
+
+            </div>
+
+
+            <!-- BLUR -->
+
+            <div class="control">
+
+                <label>
+                    Blur
+                </label>
+
+                <div>
+                    Fixed at <strong>50%</strong>
+                </div>
+
+                <small style="color:#aaa;">
+                    The image is blurred while the watermark remains sharp.
+                </small>
+
+            </div>
+
+
+            <!-- VIDEO SIZE -->
+
+            <div class="control">
+
+                <label for="videoSize">
+                    Video Size (MB, KB, GB)
+                </label>
+
+                <input
+                    type="text"
+                    id="videoSize"
+                    placeholder="e.g. 125 MB"
+                    value="125 MB"
+                >
+
+                <small style="color:#aaa;">
+                    This appears inside the bottom-left download badge.
+                </small>
+
+            </div>
+
+        </div>
+
+
+        <div class="checkbox">
+
+            <input
+                type="checkbox"
+                id="downloadScaled"
+            >
+
+            <label for="downloadScaled">
+                Download with the set scale
+            </label>
+
+        </div>
+
+
+        <button
+            id="previewBtn"
+            disabled
+        >
+            Preview
+        </button>
+
+
+        <button
+            id="downloadBtn"
+            disabled
+        >
+            Download
+        </button>
+
+
+        <div class="info">
+
+            When "Download with the set scale" is unchecked,
+            the downloaded image keeps its original dimensions.
+
+            <br><br>
+
+            When checked, the downloaded image is resized according
+            to the selected percentage.
+
+        </div>
+
+    </div>
+
+
+    <div class="panel">
+
+        <h2>Preview</h2>
+
+        <div class="preview-wrapper">
+
+            <canvas id="canvas"></canvas>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<script>
+const fileInput =
+    document.getElementById("fileInput");
+
+const uploadArea =
+    document.getElementById("uploadArea");
+
+const scaleRange =
+    document.getElementById("scaleRange");
+
+const scaleValue =
+    document.getElementById("scaleValue");
+
+const previewBtn =
+    document.getElementById("previewBtn");
+
+const downloadBtn =
+    document.getElementById("downloadBtn");
+
+const downloadScaled =
+    document.getElementById("downloadScaled");
+
+const videoSize =
+    document.getElementById("videoSize");
+
+const canvas =
+    document.getElementById("canvas");
+
+
+let sourceImage = null;
+
+// Stores the original uploaded filename
+let originalFileName = "";
+
+
+// --------------------------------------------------
+// Upload
+// --------------------------------------------------
+
+uploadArea.addEventListener(
+    "click",
+    () => {
+
+        fileInput.click();
+
+    }
+);
+
+
+fileInput.addEventListener(
+    "change",
+    function () {
+
+        const file =
+            this.files[0];
+
+        if (!file) return;
+
+
+        if (!file.type.startsWith("image/")) {
+
+            alert(
+                "Please select an image file."
+            );
+
+            return;
+        }
+
+
+        // Save the original filename
+        originalFileName =
+            file.name;
+
+
+        const reader =
+            new FileReader();
+
+
+        reader.onload =
+            function (event) {
+
+                const img =
+                    new Image();
+
+
+                img.onload =
+                    function () {
+
+                        sourceImage =
+                            img;
+
+                        previewBtn.disabled =
+                            false;
+
+                        downloadBtn.disabled =
+                            false;
+
+                        renderImage();
+
+                    };
+
+
+                img.src =
+                    event.target.result;
+
+            };
+
+
+        reader.readAsDataURL(file);
+
+    }
+);
+
+
+// --------------------------------------------------
+// Scale
+// --------------------------------------------------
+
+scaleRange.addEventListener(
+    "input",
+    function () {
+
+        scaleValue.textContent =
+            this.value;
+
+        if (sourceImage) {
+
+            renderImage();
+
+        }
+
+    }
+);
+
+
+// --------------------------------------------------
+// Video Size
+// --------------------------------------------------
+
+videoSize.addEventListener(
+    "input",
+    function () {
+
+        if (sourceImage) {
+
+            renderImage();
+
+        }
+
+    }
+);
+
+
+// --------------------------------------------------
+// Preview
+// --------------------------------------------------
+
+previewBtn.addEventListener(
+    "click",
+    function () {
+
+        if (!sourceImage) {
+
+            alert(
+                "Please upload an image first."
+            );
+
+            return;
+        }
+
+
+        renderImage();
+
+    }
+);
+
+
+// --------------------------------------------------
+// Main Render
+// --------------------------------------------------
+
+function renderImage() {
+
+    if (!sourceImage) return;
+
+
+    let scale =
+        Number(
+            scaleRange.value
+        );
+
+
+    if (scale === 0) {
+
+        scale = 1;
+
+    }
+
+
+    const scaleFactor =
+        scale / 100;
+
+
+    const outputWidth =
+        Math.max(
+            1,
+            Math.round(
+                sourceImage.naturalWidth *
+                scaleFactor
+            )
+        );
+
+
+    const outputHeight =
+        Math.max(
+            1,
+            Math.round(
+                sourceImage.naturalHeight *
+                scaleFactor
+            )
+        );
+
+
+    canvas.width =
+        outputWidth;
+
+
+    canvas.height =
+        outputHeight;
+
+
+    drawProcessedImage(
+        canvas,
+        scaleFactor
+    );
+
+}
+
+
+// --------------------------------------------------
+// Draw Processed Image
+// --------------------------------------------------
+
+function drawProcessedImage(
+    targetCanvas,
+    scaleFactor
+) {
+
+    const targetCtx =
+        targetCanvas.getContext("2d");
+
+
+    const width =
+        targetCanvas.width;
+
+
+    const height =
+        targetCanvas.height;
+
+
+    targetCtx.clearRect(
+        0,
+        0,
+        width,
+        height
+    );
+
+
+    // ==================================================
+    // 1. BLURRED IMAGE
+    // ==================================================
+
+    const blurAmount =
+        Math.max(
+            1,
+            Math.round(
+                28 *
+                scaleFactor
+            )
+        );
+
+
+    const bleed =
+        blurAmount * 5;
+
+
+    targetCtx.save();
+
+
+    targetCtx.filter =
+        `blur(${blurAmount}px)`;
+
+
+    targetCtx.drawImage(
+        sourceImage,
+        -bleed,
+        -bleed,
+        width + bleed * 2,
+        height + bleed * 2
+    );
+
+
+    targetCtx.restore();
+
+
+    // ==================================================
+    // 2. BLACK SEMI-TRANSPARENT CENTER CIRCLE
+    // ==================================================
+
+    const centerX =
+        width / 2;
+
+
+    const centerY =
+        height / 2;
+
+
+    const radius =
+        Math.min(
+            width,
+            height
+        ) * 0.08;
+
+
+    targetCtx.save();
+
+
+    targetCtx.globalAlpha =
+        0.3;
+
+
+    targetCtx.fillStyle =
+        "#000000";
+
+
+    targetCtx.beginPath();
+
+
+    targetCtx.arc(
+        centerX,
+        centerY,
+        radius,
+        0,
+        Math.PI * 2
+    );
+
+
+    targetCtx.fill();
+
+
+    targetCtx.restore();
+
+
+    // ==================================================
+    // 3. PURE WHITE RIGHT-FACING PLAY BUTTON
+    // ==================================================
+
+    const radius2 =
+        radius * 0.7;
+
+
+    const triangleWidth =
+        radius2 * 0.95;
+
+
+    const triangleHeight =
+        radius2 * 1.20;
+
+
+    const triangleLeft =
+        centerX -
+        triangleWidth * 0.42;
+
+
+    const triangleRight =
+        centerX +
+        triangleWidth * 0.58;
+
+
+    const triangleTop =
+        centerY -
+        triangleHeight / 2;
+
+
+    const triangleBottom =
+        centerY +
+        triangleHeight / 2;
+
+
+    targetCtx.save();
+
+
+    targetCtx.fillStyle =
+        "#ffffff";
+
+
+    targetCtx.lineJoin =
+        "round";
+
+
+    targetCtx.globalAlpha =
+        1;
+
+
+    targetCtx.beginPath();
+
+
+    targetCtx.moveTo(
+        triangleLeft,
+        triangleTop
+    );
+
+
+    targetCtx.lineTo(
+        triangleRight,
+        centerY
+    );
+
+
+    targetCtx.lineTo(
+        triangleLeft,
+        triangleBottom
+    );
+
+
+    targetCtx.closePath();
+
+
+    targetCtx.fill();
+
+
+    targetCtx.restore();
+
+
+    // ==================================================
+    // 4. DOWNLOAD + VIDEO SIZE PILL
+    // ==================================================
+
+    const sizeText =
+        videoSize.value.trim();
+
+
+    if (sizeText) {
+
+        const badgeScale =
+            0.8;
+
+
+        const basePillHeight =
+            Math.min(
+                width,
+                height
+            ) * 0.11;
+
+
+        const pillHeight =
+            basePillHeight *
+            badgeScale;
+
+
+        const pillRadius =
+            pillHeight / 2;
+
+
+        const horizontalPadding =
+            pillHeight * 0.32;
+
+
+        const iconSize =
+            pillHeight * 0.55;
+
+
+        const iconTextGap =
+            pillHeight * 0.20;
+
+
+        let fontSize =
+            pillHeight * 0.35;
+
+
+        if (sizeText.length > 10) {
+
+            fontSize *= 0.90;
+
+        }
+
+
+        if (sizeText.length > 15) {
+
+            fontSize *= 0.82;
+
+        }
+
+
+        if (sizeText.length > 20) {
+
+            fontSize *= 0.75;
+
+        }
+
+
+        // ----------------------------------------------
+        // Measure text
+        // ----------------------------------------------
+
+        targetCtx.save();
+
+
+        targetCtx.font =
+            `bold ${Math.max(
+                8,
+                fontSize
+            )}px Arial`;
+
+
+        const textWidth =
+            targetCtx.measureText(
+                sizeText
+            ).width;
+
+
+        // ----------------------------------------------
+        // Dynamic pill width
+        // ----------------------------------------------
+
+        const pillWidth =
+            horizontalPadding * 2 +
+            iconSize +
+            iconTextGap +
+            textWidth;
+
+
+        // ----------------------------------------------
+        // Position
+        // ----------------------------------------------
+
+        const pillX =
+            width * 0.025;
+
+
+        const pillY =
+            height -
+            pillHeight -
+            (height * 0.025);
+
+
+        // ==================================================
+        // PILL BACKGROUND
+        // ==================================================
+
+        targetCtx.globalAlpha =
+            0.20;
+
+
+        targetCtx.fillStyle =
+            "#000000";
+
+
+        targetCtx.beginPath();
+
+
+        targetCtx.roundRect(
+            pillX,
+            pillY,
+            pillWidth,
+            pillHeight,
+            pillRadius
+        );
+
+
+        targetCtx.fill();
+
+
+        // ==================================================
+        // DOWNLOAD ICON
+        // ==================================================
+
+        targetCtx.globalAlpha =
+            1.0;
+
+
+        targetCtx.strokeStyle =
+            "#ffffff";
+
+
+        targetCtx.lineWidth =
+            Math.max(
+                1.5,
+                pillHeight * 0.055
+            );
+
+
+        targetCtx.lineCap =
+            "round";
+
+
+        targetCtx.lineJoin =
+            "round";
+
+
+        const iconX =
+            pillX +
+            horizontalPadding;
+
+
+        const iconY =
+            pillY +
+            (pillHeight - iconSize) / 2;
+
+
+        const iconScale =
+            iconSize / 24;
+
+
+        // ----------------------------------------------
+        // M12 3v11
+        // ----------------------------------------------
+
+        targetCtx.beginPath();
+
+
+        targetCtx.moveTo(
+            iconX +
+            (12 * iconScale),
+
+            iconY +
+            (3 * iconScale)
+        );
+
+
+        targetCtx.lineTo(
+            iconX +
+            (12 * iconScale),
+
+            iconY +
+            (14 * iconScale)
+        );
+
+
+        targetCtx.stroke();
+
+
+        // ----------------------------------------------
+        // M7 10l5 5 5-5
+        // ----------------------------------------------
+
+        targetCtx.beginPath();
+
+
+        targetCtx.moveTo(
+            iconX +
+            (7 * iconScale),
+
+            iconY +
+            (10 * iconScale)
+        );
+
+
+        targetCtx.lineTo(
+            iconX +
+            (12 * iconScale),
+
+            iconY +
+            (15 * iconScale)
+        );
+
+
+        targetCtx.lineTo(
+            iconX +
+            (17 * iconScale),
+
+            iconY +
+            (10 * iconScale)
+        );
+
+
+        targetCtx.stroke();
+
+
+        // ----------------------------------------------
+        // M5 17v3h14v-3
+        // ----------------------------------------------
+
+        targetCtx.beginPath();
+
+
+        targetCtx.moveTo(
+            iconX +
+            (3 * iconScale),
+
+            iconY +
+            (17 * iconScale)
+        );
+
+
+        targetCtx.lineTo(
+            iconX +
+            (3 * iconScale),
+
+            iconY +
+            (20 * iconScale)
+        );
+
+
+        targetCtx.lineTo(
+            iconX +
+            (21 * iconScale),
+
+            iconY +
+            (20 * iconScale)
+        );
+
+
+        targetCtx.lineTo(
+            iconX +
+            (21 * iconScale),
+
+            iconY +
+            (17 * iconScale)
+        );
+
+
+        targetCtx.stroke();
+
+
+        // ==================================================
+        // VIDEO SIZE TEXT
+        // ==================================================
+
+        targetCtx.globalAlpha =
+            1.0;
+
+
+        targetCtx.fillStyle =
+            "#ffffff";
+
+
+        targetCtx.font =
+            `bold ${Math.max(
+                8,
+                fontSize
+            )}px Arial`;
+
+
+        targetCtx.textAlign =
+            "left";
+
+
+        targetCtx.textBaseline =
+            "middle";
+
+
+        const textX =
+            iconX +
+            iconSize +
+            iconTextGap;
+
+
+        const textY =
+            pillY +
+            pillHeight / 2;
+
+
+        targetCtx.fillText(
+            sizeText,
+            textX,
+            textY
+        );
+
+
+        targetCtx.restore();
+
+    }
+
+
+    // ==================================================
+    // 5. BOTTOM-RIGHT 24-HOUR TIMESTAMP
+    // ==================================================
+
+    const now =
+        new Date();
+
+
+    const hours =
+        String(
+            now.getHours()
+        ).padStart(2, "0");
+
+
+    const minutes =
+        String(
+            now.getMinutes()
+        ).padStart(2, "0");
+
+
+    const timestamp =
+        `${hours}:${minutes}`;
+
+
+    // --------------------------------------------------
+    // Timestamp sizing
+    // --------------------------------------------------
+
+    const timestampFontSize =
+        Math.min(
+            width,
+            height
+        ) * 0.030;
+
+
+    const timestampPaddingX =
+        timestampFontSize * 0.55;
+
+
+    const timestampPaddingY =
+        timestampFontSize * 0.05;
+
+
+    targetCtx.save();
+
+
+    targetCtx.font =
+        `bold ${Math.max(
+            8,
+            timestampFontSize
+        )}px Arial`;
+
+
+    const timestampTextWidth =
+        targetCtx.measureText(
+            timestamp
+        ).width;
+
+
+    const timestampWidth =
+        timestampTextWidth +
+        timestampPaddingX * 2;
+
+
+    const timestampHeight =
+        Math.max(
+            8,
+            timestampFontSize
+        ) +
+        timestampPaddingY * 2;
+
+
+    // --------------------------------------------------
+    // Bottom-right position
+    // --------------------------------------------------
+
+    const timestampX =
+        width -
+        timestampWidth -
+        (width * 0.025);
+
+
+    const timestampY =
+        height -
+        timestampHeight -
+        (height * 0.025);
+
+
+    // --------------------------------------------------
+    // Timestamp background
+    // --------------------------------------------------
+
+    targetCtx.globalAlpha =
+        0.20;
+
+
+    targetCtx.fillStyle =
+        "#000000";
+
+
+    targetCtx.beginPath();
+
+
+    targetCtx.roundRect(
+        timestampX,
+        timestampY,
+        timestampWidth,
+        timestampHeight,
+        timestampHeight / 2
+    );
+
+
+    targetCtx.fill();
+
+
+    // --------------------------------------------------
+    // Timestamp text
+    // --------------------------------------------------
+
+    targetCtx.globalAlpha =
+        1.0;
+
+
+    targetCtx.fillStyle =
+        "#ffffff";
+
+
+    targetCtx.textAlign =
+        "center";
+
+
+    targetCtx.textBaseline =
+        "middle";
+
+
+    targetCtx.font =
+        `bold ${Math.max(
+            8,
+            timestampFontSize
+        )}px Arial`;
+
+
+    targetCtx.fillText(
+        timestamp,
+        timestampX +
+        timestampWidth / 2,
+        timestampY +
+        timestampHeight / 2
+    );
+
+
+    targetCtx.restore();
+
+}
+
+
+// --------------------------------------------------
+// Download
+// --------------------------------------------------
+
+downloadBtn.addEventListener(
+    "click",
+    function () {
+
+        if (!sourceImage) {
+
+            alert(
+                "Please upload an image first."
+            );
+
+            return;
+        }
+
+
+        let downloadCanvas;
+
+
+        // ================================================
+        // DOWNLOAD AT SELECTED SCALE
+        // ================================================
+
+        if (downloadScaled.checked) {
+
+            let scale =
+                Number(
+                    scaleRange.value
+                );
+
+
+            if (scale === 0) {
+
+                scale = 1;
+
+            }
+
+
+            const scaleFactor =
+                scale / 100;
+
+
+            const width =
+                Math.max(
+                    1,
+                    Math.round(
+                        sourceImage.naturalWidth *
+                        scaleFactor
+                    )
+                );
+
+
+            const height =
+                Math.max(
+                    1,
+                    Math.round(
+                        sourceImage.naturalHeight *
+                        scaleFactor
+                    )
+                );
+
+
+            downloadCanvas =
+                document.createElement(
+                    "canvas"
+                );
+
+
+            downloadCanvas.width =
+                width;
+
+
+            downloadCanvas.height =
+                height;
+
+
+            drawProcessedImage(
+                downloadCanvas,
+                scaleFactor
+            );
+
+        }
+
+
+        // ================================================
+        // DOWNLOAD AT ORIGINAL SCALE
+        // ================================================
+
+        else {
+
+            downloadCanvas =
+                document.createElement(
+                    "canvas"
+                );
+
+
+            downloadCanvas.width =
+                sourceImage.naturalWidth;
+
+
+            downloadCanvas.height =
+                sourceImage.naturalHeight;
+
+
+            drawProcessedImage(
+                downloadCanvas,
+                1
+            );
+
+        }
+
+
+        // ================================================
+        // SAVE PNG
+        // ================================================
+
+        downloadCanvas.toBlob(
+            function (blob) {
+
+                if (!blob) {
+
+                    alert(
+                        "Failed to create the PNG."
+                    );
+
+                    return;
+
+                }
+
+
+                const url =
+                    URL.createObjectURL(
+                        blob
+                    );
+
+
+                const link =
+                    document.createElement(
+                        "a"
+                    );
+
+
+                link.href =
+                    url;
+
+
+                // Remove the original extension
+                // and add "_vazewatermarked.png"
+                const baseName =
+                    originalFileName.replace(
+                        /\.[^/.]+$/,
+                        ""
+                    );
+
+
+                link.download =
+                    `${baseName}_vazewatermarked.png`;
+
+
+                document.body.appendChild(
+                    link
+                );
+
+
+                link.click();
+
+
+                document.body.removeChild(
+                    link
+                );
+
+
+                URL.revokeObjectURL(
+                    url
+                );
+
+            },
+
+            "image/png"
+
+        );
+
+    }
+);
+</script>
+
+</body>
+</html>

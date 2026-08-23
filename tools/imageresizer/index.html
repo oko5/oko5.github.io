@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Image Resizer</title>
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Blue Image Resizer">
+<meta property="og:description" content="Resize images easily with live preview, invert colors, and download instantly.">
+<meta property="og:url" content="https://fxmeet.github.io/tools/ImageResizer">
+<meta property="og:image" content="https://dummyimage.com/1200x630/2196f3/ffffff.png&text=Image+Resizer">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Blue Image Resizer">
+<meta name="twitter:description" content="Resize images easily with live preview, invert colors, and download instantly.">
+<meta name="twitter:image" content="https://dummyimage.com/1200x630/2196f3/ffffff.png&text=Image+Resizer">
+
+<meta name="theme-color" content="#2196f3">
+
+<style>
+body{
+    margin:0;
+    background:#eaf4ff;
+    font-family:Arial,Helvetica,sans-serif;
+}
+
+.container{
+    max-width:900px;
+    margin:30px auto;
+    background:white;
+    padding:25px;
+    border-radius:18px;
+    box-shadow:0 10px 30px rgba(0,0,0,.15);
+}
+
+h1{
+    color:#1976d2;
+    text-align:center;
+}
+
+.controls{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:15px;
+    margin-top:20px;
+}
+
+.box{
+    background:#f6fbff;
+    border:1px solid #b8dcff;
+    border-radius:12px;
+    padding:15px;
+}
+
+input[type=number]{
+    width:100%;
+    padding:10px;
+    font-size:16px;
+    border-radius:8px;
+    border:1px solid #9ecfff;
+    margin-top:5px;
+    box-sizing:border-box;
+}
+
+input[type=file]{
+    width:100%;
+}
+
+label{
+    display:block;
+    margin-top:12px;
+}
+
+button{
+    margin-top:20px;
+    width:100%;
+    background:#2196f3;
+    color:white;
+    border:none;
+    padding:15px;
+    font-size:17px;
+    border-radius:10px;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#1976d2;
+}
+
+.preview{
+    text-align:center;
+    margin-top:25px;
+}
+
+canvas{
+    max-width:100%;
+    border-radius:10px;
+    border:2px solid #2196f3;
+    background:white;
+}
+
+.info{
+    margin-top:12px;
+    line-height:1.7;
+    color:#333;
+}
+
+.checkbox{
+    margin-top:15px;
+}
+
+#downloadMessage{
+    position:fixed;
+    left:50%;
+    bottom:25px;
+    transform:translateX(-50%);
+    background:#2196f3;
+    color:#fff;
+    padding:12px 22px;
+    border-radius:10px;
+    font-size:16px;
+    font-weight:bold;
+    box-shadow:0 6px 18px rgba(0,0,0,.25);
+    opacity:0;
+    transition:opacity .3s;
+    pointer-events:none;
+}
+
+#downloadMessage.show{
+    opacity:1;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>🖼️ Image Resizer</h1>
+
+<input type="file" id="file" accept="image/*">
+
+<div class="controls">
+
+<div class="box">
+
+<label>Width (px)</label>
+<input type="number" id="width">
+
+<label>Height (px)</label>
+<input type="number" id="height">
+
+<label class="checkbox">
+<input type="checkbox" id="lock" checked>
+Lock Aspect Ratio
+</label>
+
+<label class="checkbox">
+<input type="checkbox" id="invert">
+Invert Colors
+</label>
+
+<button id="download">Download Image</button>
+
+</div>
+
+<div class="box">
+
+<div class="info">
+<b>Original Resolution:</b>
+<div id="originalRes">-</div>
+
+<b>Original File Size:</b>
+<div id="originalSize">-</div>
+
+<b>Current Output:</b>
+<div id="currentRes">-</div>
+
+<b>Total Pixels:</b>
+<div id="totalPixels">-</div>
+</div>
+
+</div>
+
+</div>
+
+<div class="preview">
+<canvas id="canvas"></canvas>
+</div>
+
+<div id="downloadMessage">✅ Image downloaded!</div>
+
+</div>
+
+<script>
+
+const file=document.getElementById("file");
+const width=document.getElementById("width");
+const height=document.getElementById("height");
+const lock=document.getElementById("lock");
+const invert=document.getElementById("invert");
+const canvas=document.getElementById("canvas");
+const ctx=canvas.getContext("2d");
+
+const originalRes=document.getElementById("originalRes");
+const originalSize=document.getElementById("originalSize");
+const currentRes=document.getElementById("currentRes");
+const totalPixels=document.getElementById("totalPixels");
+
+let img=new Image();
+let ratio=1;
+
+function human(bytes){
+    const units=["B","KB","MB","GB"];
+    let i=0;
+    while(bytes>=1024&&i<units.length-1){
+        bytes/=1024;
+        i++;
+    }
+    return bytes.toFixed(2)+" "+units[i];
+}
+
+file.onchange=e=>{
+const f=e.target.files[0];
+if(!f)return;
+
+originalSize.textContent=human(f.size);
+
+img.onload=()=>{
+ratio=img.width/img.height;
+
+width.value=img.width;
+height.value=img.height;
+
+originalRes.textContent=img.width+" × "+img.height;
+
+draw();
+};
+
+img.src=URL.createObjectURL(f);
+};
+
+width.oninput=()=>{
+if(lock.checked){
+height.value=Math.round(width.value/ratio);
+}
+draw();
+};
+
+height.oninput=()=>{
+if(lock.checked){
+width.value=Math.round(height.value*ratio);
+}
+draw();
+};
+
+invert.onchange=draw;
+
+function draw(){
+if(!img.src)return;
+
+const w=parseInt(width.value)||1;
+const h=parseInt(height.value)||1;
+
+canvas.width=w;
+canvas.height=h;
+
+ctx.clearRect(0,0,w,h);
+ctx.drawImage(img,0,0,w,h);
+
+if(invert.checked){
+const imageData=ctx.getImageData(0,0,w,h);
+const d=imageData.data;
+
+for(let i=0;i<d.length;i+=4){
+d[i]=255-d[i];
+d[i+1]=255-d[i+1];
+d[i+2]=255-d[i+2];
+}
+
+ctx.putImageData(imageData,0,0);
+}
+
+currentRes.textContent=w+" × "+h;
+totalPixels.textContent=(w*h).toLocaleString() + " px";
+}
+
+const downloadMessage=document.getElementById("downloadMessage");
+
+document.getElementById("download").onclick=()=>{
+if(!img.src)return;
+
+const a=document.createElement("a");
+
+const randomHex=Math.floor(Math.random()*0x10000)
+.toString(16)
+.toUpperCase()
+.padStart(4,"0");
+
+a.download=`${canvas.width}_${canvas.height}_resized_${randomHex}.png`;
+a.href=canvas.toDataURL("image/png");
+a.click();
+
+downloadMessage.classList.add("show");
+
+clearTimeout(downloadMessage.timer);
+
+downloadMessage.timer=setTimeout(()=>{
+downloadMessage.classList.remove("show");
+},3000);
+
+};
+
+</script>
+
+</body>
+</html>

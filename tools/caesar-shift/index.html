@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Caesar Shift UI</title>
+
+<style>
+    body{
+        margin:0;
+        font-family: Arial, sans-serif;
+        background: linear-gradient(135deg,#1a0025,#3b0066,#12001f);
+        color:#fff;
+        display:flex;
+        justify-content:center;
+        align-items:center;
+        min-height:100vh;
+    }
+
+    .container{
+        width:90%;
+        max-width:900px;
+        background: rgba(255,255,255,0.08);
+        padding:20px;
+        border-radius:16px;
+        box-shadow:0 0 25px rgba(170,0,255,0.3);
+        backdrop-filter: blur(10px);
+    }
+
+    h1{
+        text-align:center;
+        margin-bottom:15px;
+        color:#d08bff;
+    }
+
+    textarea, input{
+        width:100%;
+        margin-top:8px;
+        margin-bottom:12px;
+        border:none;
+        border-radius:10px;
+        padding:10px;
+        font-size:14px;
+        outline:none;
+    }
+
+    textarea{
+        height:110px;
+        resize:none;
+    }
+
+    .row{
+        display:flex;
+        gap:10px;
+        flex-wrap:wrap;
+    }
+
+    .row > div{
+        flex:1;
+        min-width:120px;
+    }
+
+    .controls{
+        display:flex;
+        gap:10px;
+        align-items:center;
+        flex-wrap:wrap;
+        margin-bottom:10px;
+    }
+
+    button{
+        background:#a64dff;
+        border:none;
+        padding:10px 14px;
+        color:white;
+        border-radius:10px;
+        cursor:pointer;
+        transition:0.2s;
+    }
+
+    button:hover{
+        background:#c07bff;
+    }
+
+    label{
+        font-size:13px;
+        color:#ddd;
+    }
+
+    .small{
+        width:120px;
+    }
+
+    .out-controls{
+        display:flex;
+        gap:10px;
+        align-items:center;
+        margin-top:5px;
+        margin-bottom:10px;
+    }
+
+    .stats{
+        font-size:13px;
+        color:#caa6ff;
+        margin-top:-6px;
+        margin-bottom:10px;
+    }
+</style>
+</head>
+
+<body>
+<div class="container">
+    <h1>Caesar Shift Tool</h1>
+
+    <div class="controls">
+        <label>
+            Shift:
+            <input id="shift" type="number" value="1" class="small"/>
+        </label>
+
+        <label>
+            <input type="checkbox" id="negative"/>
+            Negative Shift
+        </label>
+
+        <label>
+            <input type="checkbox" id="emoji"/>
+            Include Emojis
+        </label>
+
+        <button onclick="resetAlphabet()">Reset Letters</button>
+    </div>
+
+    <label>Alphabet Definition (one character per line)</label>
+    <textarea id="alphabet"></textarea>
+
+    <div class="stats" id="defineStats"></div>
+
+    <div class="row">
+        <div>
+            <label>Input</label>
+            <textarea id="input"></textarea>
+        </div>
+
+        <div>
+
+    <p>        <textarea id="output" readonly></textarea>
+        </div>
+    </div>
+    <div class="out-controls">
+                        <label>Output</label>
+                <button onclick="copyOutput()">Copy</button>
+            </div>
+</div>
+
+<script>
+const baseAlphabet = [
+..."abcdefghijklmnopqrstuvwxyz",
+..."ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+..."0123456789",
+..."!@#$%^&*()-_=+[]{};:'\",.<>/?|\\`~"
+];
+
+// FULL emoji unicode coverage (no UI listing, just internal support)
+function buildEmojiSet(){
+    const ranges = [
+        [0x1F300, 0x1F5FF],
+        [0x1F600, 0x1F64F],
+        [0x1F680, 0x1F6FF],
+        [0x1F700, 0x1F77F],
+        [0x1F780, 0x1F7FF],
+        [0x1F800, 0x1F8FF],
+        [0x1F900, 0x1F9FF],
+        [0x1FA00, 0x1FAFF]
+    ];
+
+    const out = [];
+    for(const [a,b] of ranges){
+        for(let i=a;i<=b;i++){
+            try{
+                const e = String.fromCodePoint(i);
+                out.push(e);
+            }catch(e){}
+        }
+    }
+    return out;
+}
+
+const emojiSet = buildEmojiSet();
+
+const alphabetBox = document.getElementById("alphabet");
+const inputBox = document.getElementById("input");
+const outputBox = document.getElementById("output");
+const shiftBox = document.getElementById("shift");
+const negativeBox = document.getElementById("negative");
+const emojiCheck = document.getElementById("emoji");
+const statsBox = document.getElementById("defineStats");
+
+function loadDefault(){
+    alphabetBox.value = baseAlphabet.join("\n");
+}
+loadDefault();
+
+function getAlphabet(){
+    let alpha = alphabetBox.value.split("\n").filter(x => x !== "");
+
+    // ONLY append emojis to alphabet (not UI textarea)
+    if(emojiCheck.checked){
+        alpha = alpha.concat(emojiSet);
+    }
+
+    return alpha;
+}
+
+function updateStats(){
+    const lines = alphabetBox.value.split("\n").filter(x => x !== "");
+    const chars = lines.reduce((a,b) => a + b.length, 0);
+
+    statsBox.textContent =
+        `Total lines: ${lines.length} | Total characters: ${chars}`;
+}
+
+function caesarShift(text, shift, alphabet){
+    const len = alphabet.length;
+
+    return [...text].map(ch => {
+        const index = alphabet.indexOf(ch);
+        if(index === -1) return ch;
+
+        let newIndex = (index + shift) % len;
+        if(newIndex < 0) newIndex += len;
+
+        return alphabet[newIndex];
+    }).join("");
+}
+
+function update(){
+    const alphabet = getAlphabet();
+    let shift = parseInt(shiftBox.value || 0);
+
+    if(negativeBox.checked) shift = -shift;
+
+    outputBox.value = caesarShift(inputBox.value, shift, alphabet);
+    updateStats();
+}
+
+function resetAlphabet(){
+    loadDefault();
+    update();
+}
+
+function copyOutput(){
+    navigator.clipboard.writeText(outputBox.value || "");
+}
+
+[inputBox, shiftBox, negativeBox, emojiCheck, alphabetBox].forEach(el => {
+    el.addEventListener("input", update);
+    el.addEventListener("change", update);
+});
+
+update();
+</script>
+
+</body>
+</html>

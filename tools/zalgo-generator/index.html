@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Zalgo Generator</title>
+
+<meta name="description" content="Smooth 0–100% Zalgo text generator with real-time corruption control, live character & byte counters, and instant copy support.">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Zalgo Generator">
+<meta property="og:description" content="Generate smooth glitch/Zalgo text from 0% to 100% with live stats and instant copy.">
+
+<meta property="og:url" content="https://fxmeet.github.io/tools/zalgo-text-generator">
+
+<meta property="og:site_name" content="Zalgo Text Generate Tool">
+
+<meta property="og:image" content="https://dummyimage.com/1200x630/1976d2/ffffff&text=Zalgo+Generator">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Zalgo Generator">
+<meta name="twitter:description" content="0–100% smooth corruption Zalgo text generator with real-time stats.">
+<meta name="twitter:image" content="https://dummyimage.com/1200x630/1976d2/ffffff&text=Zalgo+Generator">
+
+<meta name="theme-color" content="#1976d2">
+<meta name="robots" content="index, follow">
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Arial,sans-serif;
+}
+
+body{
+    background:#eef5ff;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:20px;
+}
+
+.container{
+    width:100%;
+    max-width:900px;
+    background:#fff;
+    border-radius:18px;
+    padding:25px;
+    box-shadow:0 10px 30px rgba(0,0,0,.12);
+}
+
+h1{
+    text-align:center;
+    color:#1976d2;
+    margin-bottom:20px;
+}
+
+label{
+    font-weight:bold;
+    display:block;
+    margin-bottom:8px;
+    color:#333;
+}
+
+textarea{
+    width:100%;
+    min-height:150px;
+    resize:vertical;
+    padding:12px;
+    border:2px solid #dbeafe;
+    border-radius:12px;
+    font-size:16px;
+    outline:none;
+}
+
+textarea:focus{
+    border-color:#2196f3;
+}
+
+.stats{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-top:10px;
+    margin-bottom:15px;
+}
+
+.stat{
+    background:#e3f2fd;
+    color:#1565c0;
+    padding:8px 12px;
+    border-radius:10px;
+    font-size:14px;
+}
+
+.control{
+    margin:15px 0;
+}
+
+.range-header{
+    display:flex;
+    justify-content:space-between;
+    font-weight:bold;
+    color:#1976d2;
+    margin-bottom:8px;
+}
+
+input[type=range]{
+    width:100%;
+}
+
+button{
+    width:100%;
+    border:none;
+    padding:14px;
+    border-radius:12px;
+    font-size:16px;
+    font-weight:bold;
+    cursor:pointer;
+    background:#2196f3;
+    color:white;
+}
+
+button:hover{
+    background:#1976d2;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Zalgo Generator</h1>
+
+<label>Input</label>
+<textarea id="input"></textarea>
+
+<div class="stats">
+    <div class="stat">Length: <span id="inLen">0</span></div>
+    <div class="stat">Bytes: <span id="inBytes">0</span></div>
+</div>
+
+<div class="control">
+    <div class="range-header">
+        <span>Corruption: <span id="lvlText">0%</span></span>
+    </div>
+    <input type="range" id="level" min="0" max="100" value="0">
+</div>
+
+<button id="copy">Copy</button>
+
+<label style="margin-top:20px;">Output</label>
+<textarea id="out" readonly></textarea>
+
+<div class="stats">
+    <div class="stat">Length: <span id="outLen">0</span></div>
+    <div class="stat">Bytes: <span id="outBytes">0</span></div>
+</div>
+<p><code>Please check out the <a href="/tools/zalgo-purifier/">Zalgo Text Purifier!</a> Remove and filter broken text with ease. </code></p>
+</div>
+
+<script>
+const up=['\u030d','\u030e','\u0304','\u0305','\u033f','\u0311','\u0306','\u0310','\u0352','\u0357','\u0351','\u0307','\u0308','\u030a'];
+const mid=['\u0334','\u0335','\u0336','\u035c','\u035d'];
+const down=['\u0316','\u0317','\u0318','\u0319','\u031c','\u031d','\u031e','\u031f','\u0320','\u0324','\u0325','\u0326','\u0329'];
+
+const enc=new TextEncoder();
+
+const input=document.getElementById("input");
+const out=document.getElementById("out");
+const level=document.getElementById("level");
+const lvlText=document.getElementById("lvlText");
+
+const inLen=document.getElementById("inLen");
+const inBytes=document.getElementById("inBytes");
+const outLen=document.getElementById("outLen");
+const outBytes=document.getElementById("outBytes");
+
+function r(a){return a[Math.random()*a.length|0];}
+function bytes(s){return enc.encode(s).length;}
+
+function zalgo(t,lvl){
+    const x=lvl/100;
+    if(x<=0) return t;
+
+    let rstr="";
+
+    for(const c of t){
+        rstr+=c;
+        if(c===" ") continue;
+
+        const max=20;
+        const exact=x*max;
+
+        const base=exact|0;
+        const extra=Math.random()<(exact-base)?1:0;
+
+        const m=base+extra;
+
+        for(let i=0;i<m;i++){
+            const z=Math.random();
+            if(z<0.33) rstr+=r(up);
+            else if(z<0.66) rstr+=r(mid);
+            else rstr+=r(down);
+        }
+    }
+    return rstr;
+}
+
+function render(){
+    const text=input.value;
+    const lvl=+level.value;
+
+    lvlText.textContent=lvl+"%";
+
+    const output=zalgo(text,lvl);
+    out.value=output;
+
+    inLen.textContent=text.length;
+    inBytes.textContent=bytes(text);
+
+    outLen.textContent=output.length;
+    outBytes.textContent=bytes(output);
+}
+
+input.addEventListener("input",render);
+level.addEventListener("input",render);
+
+document.getElementById("copy").onclick=async()=>{
+    await navigator.clipboard.writeText(out.value);
+};
+
+render();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Zalgo Purifier</title>
+
+<meta name="description" content="Remove Zalgo / corrupted combining characters and restore clean readable text instantly.">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Zalgo Purifier">
+<meta property="og:description" content="Instantly clean corrupted Zalgo text and remove combining marks.">
+
+<meta property="og:url" content="https://example.com/zalgo-purifier">
+
+<meta property="og:site_name" content="Zalgo Purifier Tool">
+
+<meta property="og:image" content="https://dummyimage.com/1200x630/4caf50/ffffff&text=Zalgo+Purifier">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Zalgo Purifier">
+<meta name="twitter:description" content="Clean Zalgo/glitch text instantly with byte + length stats.">
+<meta name="twitter:image" content="https://dummyimage.com/1200x630/4caf50/ffffff&text=Zalgo+Purifier">
+
+<meta name="theme-color" content="#4caf50">
+<meta name="robots" content="index, follow">
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Arial,sans-serif;
+}
+
+body{
+    background:#eefaf0;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:20px;
+}
+
+.container{
+    width:100%;
+    max-width:900px;
+    background:#fff;
+    border-radius:18px;
+    padding:25px;
+    box-shadow:0 10px 30px rgba(0,0,0,.12);
+}
+
+h1{
+    text-align:center;
+    color:#2e7d32;
+    margin-bottom:20px;
+}
+
+label{
+    font-weight:bold;
+    display:block;
+    margin-bottom:8px;
+    color:#333;
+}
+
+textarea{
+    width:100%;
+    min-height:150px;
+    resize:vertical;
+    padding:12px;
+    border:2px solid #c8e6c9;
+    border-radius:12px;
+    font-size:16px;
+    outline:none;
+}
+
+textarea:focus{
+    border-color:#4caf50;
+}
+
+.stats{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-top:10px;
+    margin-bottom:15px;
+}
+
+.stat{
+    background:#e8f5e9;
+    color:#1b5e20;
+    padding:8px 12px;
+    border-radius:10px;
+    font-size:14px;
+}
+
+button{
+    width:100%;
+    border:none;
+    padding:14px;
+    border-radius:12px;
+    font-size:16px;
+    font-weight:bold;
+    cursor:pointer;
+    background:#4caf50;
+    color:white;
+}
+
+button:hover{
+    background:#388e3c;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Zalgo Purifier</h1>
+
+<label>Input (corrupted text)</label>
+<textarea id="input"></textarea>
+
+<div class="stats">
+    <div class="stat">Input Length: <span id="inLen">0</span></div>
+    <div class="stat">Input Bytes: <span id="inBytes">0</span></div>
+</div>
+
+<button id="clean">Clean Text</button>
+
+<label style="margin-top:20px;">Output (clean text)</label>
+<textarea id="out" readonly></textarea>
+
+<div class="stats">
+    <div class="stat">Output Length: <span id="outLen">0</span></div>
+    <div class="stat">Output Bytes: <span id="outBytes">0</span></div>
+</div>
+
+<button id="copy">Copy Result</button>
+
+<p><code>Please check out the <a href="/tools/zalgo-generator">Zalgo Text Generator!</a> Generate broken text with ease. </code></p>
+</div>
+
+<script>
+const enc = new TextEncoder();
+
+function bytes(str){
+    return enc.encode(str).length;
+}
+
+// remove combining marks (Zalgo layers)
+function removeZalgo(str){
+    return str
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "");
+}
+
+const input = document.getElementById("input");
+const out = document.getElementById("out");
+
+const inLen = document.getElementById("inLen");
+const inBytes = document.getElementById("inBytes");
+const outLen = document.getElementById("outLen");
+const outBytes = document.getElementById("outBytes");
+
+function render(){
+    const text = input.value;
+    const cleaned = removeZalgo(text);
+
+    out.value = cleaned;
+
+    inLen.textContent = text.length;
+    inBytes.textContent = bytes(text);
+
+    outLen.textContent = cleaned.length;
+    outBytes.textContent = bytes(cleaned);
+}
+
+document.getElementById("clean").onclick = render;
+
+document.getElementById("copy").onclick = async () => {
+    await navigator.clipboard.writeText(out.value);
+};
+
+input.addEventListener("input", render);
+
+render();
+</script>
+
+</body>
+</html>
