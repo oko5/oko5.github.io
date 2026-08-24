@@ -1,0 +1,226 @@
+(async () => {
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    /*
+     * CLICK VIEW ALL
+     */
+    const viewMore = [...document.querySelectorAll('[role="button"]')]
+        .find(el => /^View all \(\d+ more\)$/i.test(el.textContent.trim()));
+
+    if (viewMore) {
+        console.log('Clicking:', viewMore.textContent.trim());
+        viewMore.click();
+        await sleep(800);
+    }
+
+    /*
+     * FIND THE EXPANDED VIRTUALIZED LIST
+     *
+     * It contains elements like:
+     * [data-testid="list-item-3"]
+     */
+    const listItem = document.querySelector(
+        '[data-testid^="list-item-"] [data-testid="cell-frame-title"]'
+    );
+
+    if (!listItem) {
+        console.error('Expanded member list not found.');
+        return;
+    }
+
+    /*
+     * The actual virtualized list is the ancestor containing
+     * many list-item elements.
+     */
+    let list = listItem;
+
+    while (
+        list &&
+        list.querySelectorAll('[data-testid^="list-item-"]').length < 2
+    ) {
+        list = list.parentElement;
+    }
+
+    if (!list) {
+        console.error('Could not locate virtualized list container.');
+        return;
+    }
+
+    /*
+     * Find the scrollable ancestor.
+     */
+    let scrollContainer = list;
+
+    while (
+        scrollContainer &&
+        scrollContainer !== document.body &&
+        scrollContainer.scrollHeight <= scrollContainer.clientHeight
+    ) {
+        scrollContainer = scrollContainer.parentElement;
+    }
+
+    if (!scrollContainer) {
+        console.error('Scrollable member list not found.');
+        return;
+    }
+
+    console.log('List:', list);
+    console.log('Scroll container:', scrollContainer);
+
+    /*
+     * Existing names so we don't add duplicates.
+     */
+    const knownNames = new Set([
+        ...result.adminRightClickElement,
+        ...result.memberRightClickElement
+    ].map(x => x.name));
+
+    /*
+     * COLLECT CURRENTLY RENDERED MEMBERS
+     */
+    const collect = () => {
+        let added = 0;
+
+        list.querySelectorAll('[data-testid^="list-item-"]')
+            .forEach(row => {
+
+                /*
+                 * This excludes section headers automatically.
+                 */
+                const title = row.querySelector(
+                    '[data-testid="cell-frame-title"] span[dir="auto"]'
+                );
+
+                if (!title) return;
+
+                const name = title.textContent.trim();
+
+                /*
+                 * This is the actual clickable member row:
+                 *
+                 * <div tabindex="-1" role="button">
+                 */
+                const clickable = row.querySelector(
+                    ':scope > div[role="button"]'
+                );
+
+                if (!clickable) return;
+
+                /*
+                 * Do not exclude unusual names such as "~".
+                 * Only exclude "You".
+                 */
+                if (!name || name === 'You') return;
+
+                if (knownNames.has(name)) return;
+
+                const data = {
+                    name,
+                    element: clickable
+                };
+
+                if (
+                    row.querySelector(
+                        '[data-testid="group-admin-marker"]'
+                    )
+                ) {
+                    result.adminRightClickElement.push(data);
+                } else {
+                    result.memberRightClickElement.push(data);
+                }
+
+                knownNames.add(name);
+                added++;
+            });
+
+        return added;
+    };
+
+    /*
+     * COLLECT WHAT IS CURRENTLY RENDERED
+     */
+    console.log(
+        'Initially visible:',
+        collect()
+    );
+
+    /*
+     * SCROLL THROUGH VIRTUALIZED LIST
+     *
+     * The important part is that we collect BEFORE and AFTER
+     * every scroll because WhatsApp replaces the DOM rows.
+     */
+    let previousScrollTop = -1;
+    let stuck = 0;
+
+    while (true) {
+        collect();
+
+        const maxScroll =
+            scrollContainer.scrollHeight -
+            scrollContainer.clientHeight;
+
+        if (maxScroll <= 0) break;
+
+        const current = scrollContainer.scrollTop;
+
+        if (current >= maxScroll - 5) {
+            await sleep(300);
+            collect();
+            break;
+        }
+
+        const next = Math.min(
+            current + Math.max(
+                400,
+                scrollContainer.clientHeight * 0.7
+            ),
+            maxScroll
+        );
+
+        scrollContainer.scrollTop = next;
+
+        /*
+         * Give the virtualized renderer time to replace
+         * list-item elements.
+         */
+        await sleep(120);
+
+        if (scrollContainer.scrollTop === previousScrollTop) {
+            stuck++;
+        } else {
+            stuck = 0;
+        }
+
+        previousScrollTop = scrollContainer.scrollTop;
+
+        if (stuck >= 5) {
+            console.warn('Scroll position stopped changing.');
+            break;
+        }
+    }
+
+    /*
+     * FINAL COLLECTION
+     */
+    collect();
+
+    console.log('==============================');
+    console.log(
+        'Admins:',
+        result.adminRightClickElement.length
+    );
+    console.log(
+        'Members:',
+        result.memberRightClickElement.length
+    );
+    console.log(
+        'Admin elements:',
+        result.adminRightClickElement
+    );
+    console.log(
+        'Member elements:',
+        result.memberRightClickElement
+    );
+    console.log('==============================');
+})();
