@@ -1,10 +1,12 @@
-
 function rightClick(action, memberName) {
 
-    // Support:
+    // ============================================================
+    // SUPPORT:
     // rightClick("username")
-    // rightClick("deadmin", "username")
+    // rightClick("unadmin", "username")
     // rightClick("readmin", "username")
+    // rightClick("remuser", "username")
+    // ============================================================
 
     if (memberName === undefined) {
         memberName = action;
@@ -44,7 +46,7 @@ function rightClick(action, memberName) {
     }
 
     // ============================================================
-    // LEFT CLICK
+    // LEFT CLICK HELPER
     // ============================================================
 
     function leftClick(element) {
@@ -89,7 +91,7 @@ function rightClick(action, memberName) {
     }
 
     // ============================================================
-    // RIGHT CLICK
+    // RIGHT CLICK MEMBER
     // ============================================================
 
     const rect = nameElement.getBoundingClientRect();
@@ -128,33 +130,38 @@ function rightClick(action, memberName) {
         action ? `(action: ${action})` : ''
     );
 
-    // No action = stop after right-click
+    // No action = only right-click
     if (!action) {
         return;
     }
 
     // ============================================================
-    // FIRST MENU ACTION
+    // ACTION → FIRST MENU TEXT
     // ============================================================
 
     const menuText = {
         unadmin: 'Dismiss as admin',
-        readmin: 'Make group admin'
+        readmin: 'Make group admin',
+        remuser: 'Remove'
     }[action];
 
     if (!menuText) {
         console.error(
-            `Unknown action "${action}". Supported: deadmin, readmin`
+            `Unknown action "${action}". ` +
+            `Supported: unadmin, readmin, remuser`
         );
         return;
     }
 
-    let attempts = 0;
-    const maxAttempts = 5;
+    // ============================================================
+    // FIND VISIBLE EXACT TEXT
+    // ============================================================
 
     const findVisibleText = (text) => {
         return [...document.querySelectorAll('*')]
-            .filter(el => el.textContent.trim() === text)
+            .filter(el =>
+                el.textContent.trim() === text
+            )
             .filter(el => {
                 const r = el.getBoundingClientRect();
 
@@ -177,6 +184,13 @@ function rightClick(action, memberName) {
             })[0];
     };
 
+    // ============================================================
+    // CLICK FIRST MENU ACTION
+    // ============================================================
+
+    let attempts = 0;
+    const maxAttempts = 10;
+
     const clickFirstMenuAction = () => {
         attempts++;
 
@@ -184,9 +198,14 @@ function rightClick(action, memberName) {
 
         if (!textElement) {
             if (attempts < maxAttempts) {
-                setTimeout(clickFirstMenuAction, 100);
+                setTimeout(
+                    clickFirstMenuAction,
+                    100
+                );
             } else {
-                console.error(`"${menuText}" not found`);
+                console.error(
+                    `"${menuText}" not found`
+                );
             }
 
             return;
@@ -211,21 +230,29 @@ function rightClick(action, memberName) {
         );
 
         // ========================================================
-        // READMIN CONFIRMATION
+        // READMIN → CONFIRM "MAKE GROUP ADMIN"
         // ========================================================
 
         if (action === 'readmin') {
             clickReadminConfirmation();
         }
+
+        // ========================================================
+        // REMUSER → CONFIRM "REMOVE"
+        // ========================================================
+
+        if (action === 'remuser') {
+            clickRemoveConfirmation();
+        }
     };
 
     // ============================================================
-    // SECOND "MAKE GROUP ADMIN" CONFIRMATION
+    // READMIN CONFIRMATION
     // ============================================================
 
     const clickReadminConfirmation = () => {
         let confirmAttempts = 0;
-        const maxConfirmAttempts = 5;
+        const maxConfirmAttempts = 10;
 
         const findConfirmation = () => {
             confirmAttempts++;
@@ -245,15 +272,17 @@ function rightClick(action, memberName) {
                     );
                 });
 
-            // Prefer the confirmation span matching the structure
-            // you provided, but fall back to any visible exact match.
-            const confirmation = candidates.find(span =>
-                span.classList.contains('html-span')
-            ) || candidates[0];
+            const confirmation =
+                candidates.find(span =>
+                    span.classList.contains('html-span')
+                ) || candidates[0];
 
             if (!confirmation) {
                 if (confirmAttempts < maxConfirmAttempts) {
-                    setTimeout(findConfirmation, 50);
+                    setTimeout(
+                        findConfirmation,
+                        50
+                    );
                 } else {
                     console.error(
                         'Confirmation "Make group admin" not found'
@@ -268,7 +297,6 @@ function rightClick(action, memberName) {
                 confirmation
             );
 
-            // Click the confirmation itself or its clickable parent.
             const clickable =
                 confirmation.closest(
                     '[role="button"], [role="menuitem"], [role="option"]'
@@ -283,10 +311,96 @@ function rightClick(action, memberName) {
             );
         };
 
-        // Start almost immediately after the first click.
-        setTimeout(findConfirmation, 50);
+        setTimeout(
+            findConfirmation,
+            50
+        );
     };
+
+    // ============================================================
+    // REMUSER CONFIRMATION
+    // ============================================================
+
+    const clickRemoveConfirmation = () => {
+        let confirmAttempts = 0;
+        const maxConfirmAttempts = 10;
+
+        const findRemoveConfirmation = () => {
+            confirmAttempts++;
+
+            const candidates = [...document.querySelectorAll('span')]
+                .filter(span =>
+                    span.textContent.trim() === 'Remove'
+                )
+                .filter(span => {
+                    const r = span.getBoundingClientRect();
+
+                    return (
+                        r.width > 0 &&
+                        r.height > 0 &&
+                        r.top >= 0 &&
+                        r.left >= 0
+                    );
+                });
+
+            /*
+             * Prefer the confirmation span with "html-span".
+             * The confirmation element you provided is:
+             *
+             * <span class="html-span ...">
+             *     Remove
+             * </span>
+             */
+
+            const confirmation =
+                candidates.find(span =>
+                    span.classList.contains('html-span')
+                ) || candidates[0];
+
+            if (!confirmation) {
+                if (confirmAttempts < maxConfirmAttempts) {
+                    setTimeout(
+                        findRemoveConfirmation,
+                        50
+                    );
+                } else {
+                    console.error(
+                        'Confirmation "Remove" not found'
+                    );
+                }
+
+                return;
+            }
+
+            console.log(
+                'Found confirmation "Remove":',
+                confirmation
+            );
+
+            const clickable =
+                confirmation.closest(
+                    '[role="button"], [role="menuitem"], [role="option"]'
+                ) ||
+                confirmation.parentElement ||
+                confirmation;
+
+            leftClick(clickable);
+
+            console.log(
+                `Confirmed "Remove" for "${memberName}"`
+            );
+        };
+
+        setTimeout(
+            findRemoveConfirmation,
+            50
+        );
+    };
+
+    // ============================================================
+    // START
+    // ============================================================
 
     clickFirstMenuAction();
 }
-rightClick("readmin","oekoff")
+rightClick("remuser","oekoff");
