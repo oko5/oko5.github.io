@@ -55,23 +55,31 @@
 
     /*
      * ============================================================
-     * 2. FIND EXACT VIEW ALL TEXT ELEMENT
+     * 2. FIND "VIEW ALL (NUMBER MORE)" AUTOMATICALLY
      * ============================================================
+     *
+     * Does NOT depend on:
+     * - changing number
+     * - changing CSS classes
+     *
+     * Matches:
+     * View all (127 more)
+     * View all (150 more)
+     * View all (1 more)
+     * etc.
      */
 
-    const viewAllText = document.querySelector(
-        'div.x1c4vz4f.xs83m0k.xdl72j9.x1g77sc7.xeuugli.x2lwn1j.xozqiw3.xqcrz7y.x12fk4p8.x1v5yvga'
-    );
+    const viewAllText = Array.from(
+        document.querySelectorAll('div')
+    ).find(el => {
+        const text = el.textContent.trim();
 
-    /*
-     * Make sure it is actually the View all element.
-     */
-    if (
-        !viewAllText ||
-        viewAllText.textContent.trim() !== 'View all (150 more)'
-    ) {
+        return /^View all \(\d+ more\)$/.test(text);
+    });
+
+    if (!viewAllText) {
         console.log(
-            'View all (150 more) element not found.'
+            'View all (NUMBER more) element not found.'
         );
         return;
     }
@@ -116,15 +124,17 @@
         'View all parent button clicked.'
     );
 
+
     /*
-     * Wait for the expanded contacts list.
+     * Wait for expanded contacts list.
      */
+
     await sleep(500);
 
 
     /*
      * ============================================================
-     * 5. ORIGINAL SCROLLING CODE
+     * 5. FIND ACTUAL SCROLLABLE CONTACTS CONTAINER
      * ============================================================
      */
 
@@ -192,15 +202,14 @@
     );
 
 
-    const seen = new Set();
-    let unchangedRounds = 0;
-
-
     /*
      * ============================================================
      * 6. SCAN CONTACTS
      * ============================================================
      */
+
+    const seen = new Set();
+    let unchangedRounds = 0;
 
     const scan = () => {
 
@@ -214,6 +223,7 @@
             /*
              * Find username.
              */
+
             const nameElement =
                 item.querySelector('span[title]');
 
@@ -224,15 +234,18 @@
                 nameElement.textContent?.trim() ||
                 '(name not found)';
 
+
             /*
              * Exclude yourself.
              */
+
             if (name === 'You') return;
 
 
             /*
              * Find target gridcell.
              */
+
             const targetElement =
                 nameElement.closest(
                     '[role="gridcell"]'
@@ -249,6 +262,7 @@
             /*
              * EXACTLY 3 levels upward.
              */
+
             const parentAncestor =
                 targetElement.parentElement
                     ?.parentElement
@@ -258,6 +272,7 @@
             /*
              * Prevent duplicate logging.
              */
+
             const key =
                 name +
                 '|' +
@@ -308,6 +323,7 @@
         /*
          * Realtime scan before scrolling.
          */
+
         scan();
 
         const before =
@@ -324,9 +340,11 @@
 
         await sleep(100);
 
+
         /*
          * Realtime scan after rendering.
          */
+
         scan();
 
         const after =
