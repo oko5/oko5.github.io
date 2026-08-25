@@ -1,7 +1,17 @@
 (async () => {
+    console.clear();
+
     const sleep = ms =>
         new Promise(resolve => setTimeout(resolve, ms));
 
+    // =========================================================
+    // RESULT
+    // =========================================================
+
+    const result = {
+        initial: [],
+        viewMore: []
+    };
 
     // =========================================================
     // CLICK HELPER
@@ -29,7 +39,6 @@
         }));
     };
 
-
     // =========================================================
     // OPEN GROUP INFORMATION
     // =========================================================
@@ -55,7 +64,6 @@
 
     await sleep(500);
 
-
     // =========================================================
     // BASIC GROUP INFORMATION
     // =========================================================
@@ -77,265 +85,193 @@
     const memberCount =
         membersButton?.textContent.trim() || null;
 
-
     // =========================================================
-    // MEMBER STORAGE
-    //
-    // Map automatically removes duplicate members.
+    // ADMIN STORAGE
     // =========================================================
 
-    const memberNames = new Map();
     const admins = new Map();
 
     let amIAdmin = false;
-    let myMemberRow = null;
-
 
     // =========================================================
-    // ADD MEMBER TO UNIQUE STORAGE
+    // INITIAL MEMBER SCAN
+    // ONLY NAMES
     // =========================================================
 
-    const addMember = (name, row) => {
+    const initialSeen = new Set();
 
-        if (!name) return;
+    const scanInitial = () => {
 
-        const cleanName =
-            name
-                .replace(/\s+/g, ' ')
-                .trim();
+        const members = document.querySelectorAll(
+            '[aria-label^="Members list"] [role="listitem"]'
+        );
 
-        if (!cleanName) return;
+        members.forEach(member => {
 
-        const key =
-            cleanName.toLocaleLowerCase();
-
-        // -----------------------------------------------------
-        // UNIQUE MEMBER
-        // -----------------------------------------------------
-
-        if (!memberNames.has(key)) {
-            memberNames.set(
-                key,
-                cleanName
-            );
-        }
-
-
-        // -----------------------------------------------------
-        // ADMIN
-        // -----------------------------------------------------
-
-        const isAdmin =
-            !!row.querySelector(
-                '[data-testid="group-admin-marker"]'
+            const element = member.querySelector(
+                '[data-testid="cell-frame-title"] span[dir="auto"]'
             );
 
-        if (isAdmin) {
-
-            admins.set(
-                key,
-                cleanName
-            );
-        }
-
-
-        // -----------------------------------------------------
-        // CURRENT USER
-        //
-        // Your supplied HTML shows:
-        //
-        // <span title="You">You</span>
-        //
-        // Therefore we use the title attribute instead of
-        // guessing from text.
-        // -----------------------------------------------------
-
-        const youElement =
-            row.querySelector(
-                'span[title="You"]'
-            );
-
-        if (youElement) {
-
-            myMemberRow = row;
-
-            amIAdmin = isAdmin;
-
-            console.log(
-                '========== CURRENT USER FOUND =========='
-            );
-
-            console.log(
-                'You:',
-                cleanName
-            );
-
-            console.log(
-                'Admin:',
-                isAdmin
-            );
-        }
-    };
-
-
-    // =========================================================
-    // COLLECT MEMBERS FROM A CONTAINER
-    // =========================================================
-
-    const collectMembersFromContainer = container => {
-
-        if (!container) return 0;
-
-        const rows =
-            container.querySelectorAll(
-                '[data-testid^="list-item-"]'
-            );
-
-        let collected = 0;
-
-        rows.forEach(row => {
-
-            // Ignore section headers
-            if (
-                row.querySelector(
-                    '[data-testid="section-header"]'
-                )
-            ) {
-                return;
-            }
-
-            const nameElement =
-                row.querySelector(
-                    '[data-testid="cell-frame-title"] span[dir="auto"]'
-                );
-
-            if (!nameElement) return;
+            if (!element) return;
 
             const name =
-                nameElement.textContent
+                element.textContent
                     .replace(/\s+/g, ' ')
                     .trim();
 
-            if (!name) return;
+            if (!name || name === 'You') return;
 
-            addMember(
-                name,
-                row
-            );
+            const key =
+                name.toLocaleLowerCase();
 
-            collected++;
+            if (initialSeen.has(key)) return;
+
+            initialSeen.add(key);
+
+            result.initial.push(name);
+
+            // ---------------------------------------------
+            // ADMIN
+            // ---------------------------------------------
+
+            const isAdmin =
+                !!member.querySelector(
+                    '[data-testid="group-admin-marker"]'
+                );
+
+            if (isAdmin) {
+                admins.set(key, name);
+            }
+
+            // ---------------------------------------------
+            // CURRENT USER
+            // ---------------------------------------------
+
+            const youElement =
+                member.querySelector(
+                    'span[title="You"]'
+                );
+
+            if (youElement) {
+                amIAdmin = isAdmin;
+            }
         });
-
-        return collected;
     };
 
+    scanInitial();
 
     // =========================================================
     // FIND VIEW ALL
     // =========================================================
 
-    const findViewAll = () => {
+    const viewAllText = Array.from(
+        document.querySelectorAll('div')
+    ).find(el => {
 
-        return [...document.querySelectorAll('div')]
-            .find(div =>
-                /^View all \(\d+ more\)$/i.test(
-                    div.textContent.trim()
-                )
+        const text =
+            el.textContent.trim();
+
+        return /^View all \(\d+ more\)$/i.test(text);
+    });
+
+    // =========================================================
+    // VIEW MORE SCAN
+    // =========================================================
+
+    const viewMoreSeen = new Set();
+
+    const scanViewMore = modal => {
+
+        if (!modal) return;
+
+        const items =
+            modal.querySelectorAll(
+                '[role="listitem"]'
             );
+
+        items.forEach(item => {
+
+            const nameElement =
+                item.querySelector(
+                    'span[title]'
+                );
+
+            if (!nameElement) return;
+
+            let name =
+                nameElement.getAttribute('title') ||
+                nameElement.textContent?.trim();
+
+            if (!name) return;
+
+            name =
+                name
+                    .replace(/\s+/g, ' ')
+                    .trim();
+
+            if (!name || name === 'You') return;
+
+            const key =
+                name.toLocaleLowerCase();
+
+            if (viewMoreSeen.has(key)) return;
+
+            viewMoreSeen.add(key);
+
+            result.viewMore.push(name);
+
+            // ---------------------------------------------
+            // ADMIN
+            // ---------------------------------------------
+
+            const isAdmin =
+                !!item.querySelector(
+                    '[data-testid="group-admin-marker"]'
+                );
+
+            if (isAdmin) {
+                admins.set(key, name);
+            }
+
+            // ---------------------------------------------
+            // CURRENT USER
+            // ---------------------------------------------
+
+            const youElement =
+                item.querySelector(
+                    'span[title="You"]'
+                );
+
+            if (youElement) {
+                amIAdmin = isAdmin;
+            }
+        });
     };
 
-
     // =========================================================
-    // FIND PARTICIPANTS SECTION
-    // =========================================================
-
-    const findParticipantsSection = () => {
-
-        return document.querySelector(
-            '[data-testid="group-info-participants-section"]'
-        );
-    };
-
-
-    // =========================================================
-    // INITIAL PARTICIPANTS SECTION
+    // CLICK VIEW ALL
     // =========================================================
 
-    const participantsSection =
-        findParticipantsSection();
+    if (viewAllText) {
 
-    if (!participantsSection) {
+        const viewAllButton =
+            viewAllText.closest('[role="button"]') ||
+            viewAllText;
 
-        console.error(
-            'Group participants section not found.'
-        );
-
-        return;
-    }
-
-
-    // =========================================================
-    // FIRST COLLECTION
-    //
-    // This handles the members already visible in the
-    // group information panel.
-    // =========================================================
-
-    collectMembersFromContainer(
-        participantsSection
-    );
-
-
-    // =========================================================
-    // VIEW ALL
-    // =========================================================
-
-    const viewAll =
-        findViewAll();
-
-
-    // =========================================================
-    // IF VIEW ALL EXISTS
-    // =========================================================
-
-    if (viewAll) {
-
-        console.log(
-            '============================================'
-        );
-
-        console.log(
-            'VIEW ALL FOUND'
-        );
-
-        console.log(
-            viewAll.textContent.trim()
-        );
-
-        console.log(
-            'Clicking View all...'
-        );
-
-        console.log(
-            '============================================'
-        );
-
-
-        dispatchClick(viewAll);
+        dispatchClick(viewAllButton);
 
         await sleep(700);
 
-
-        // -----------------------------------------------------
+        // =====================================================
         // FIND CONTACTS MODAL
-        // -----------------------------------------------------
+        // =====================================================
 
-        const contactsModal =
+        const modal =
             document.querySelector(
                 '[data-testid="contacts-modal"]'
             );
 
-        if (!contactsModal) {
+        if (!modal) {
 
             console.warn(
                 'Contacts modal not found after View all.'
@@ -347,91 +283,80 @@
                 'Contacts modal found.'
             );
 
+            // =================================================
+            // FIND FIRST LIST ITEM
+            // =================================================
 
-            // -------------------------------------------------
-            // COLLECT CURRENTLY VISIBLE MEMBERS
-            // -------------------------------------------------
-
-            collectMembersFromContainer(
-                contactsModal
-            );
-
-
-            // -------------------------------------------------
-            // FIND SCROLLABLE CONTAINER
-            // -------------------------------------------------
-
-            const getScrollableAncestors =
-                element => {
-
-                    const result = [];
-
-                    let current = element;
-
-                    while (
-                        current &&
-                        current !== document.body &&
-                        current !== document.documentElement
-                    ) {
-
-                        const style =
-                            getComputedStyle(current);
-
-                        const overflowY =
-                            style.overflowY;
-
-                        if (
-                            (
-                                overflowY === 'auto' ||
-                                overflowY === 'scroll' ||
-                                overflowY === 'overlay'
-                            ) &&
-                            current.scrollHeight >
-                                current.clientHeight
-                        ) {
-                            result.push(current);
-                        }
-
-                        current =
-                            current.parentElement;
-                    }
-
-                    return result;
-                };
-
-
-            const firstListItem =
-                contactsModal.querySelector(
-                    '[data-testid="list-item-0"]'
+            const firstItem =
+                modal.querySelector(
+                    '[role="listitem"]'
                 );
 
+            // =================================================
+            // FIND ACTUAL SCROLLABLE CONTAINER
+            // =================================================
+
+            const getScrollableAncestors = element => {
+
+                const ancestors = [];
+
+                let current = element;
+
+                while (
+                    current &&
+                    current !== modal &&
+                    current !== document.body
+                ) {
+
+                    const style =
+                        getComputedStyle(current);
+
+                    const overflowY =
+                        style.overflowY;
+
+                    if (
+                        (
+                            overflowY === 'auto' ||
+                            overflowY === 'scroll' ||
+                            overflowY === 'overlay'
+                        ) &&
+                        current.scrollHeight >
+                            current.clientHeight
+                    ) {
+                        ancestors.push(current);
+                    }
+
+                    current =
+                        current.parentElement;
+                }
+
+                return ancestors;
+            };
 
             let scrollContainer = null;
 
+            // ---------------------------------------------
+            // PRIMARY SEARCH
+            // ---------------------------------------------
 
-            if (firstListItem) {
+            if (firstItem) {
 
                 const ancestors =
-                    getScrollableAncestors(
-                        firstListItem
-                    );
+                    getScrollableAncestors(firstItem);
 
                 if (ancestors.length) {
-
-                    scrollContainer =
-                        ancestors[0];
+                    scrollContainer = ancestors[0];
                 }
             }
 
-
-            // -------------------------------------------------
-            // SECONDARY SCROLL SEARCH
-            // -------------------------------------------------
+            // ---------------------------------------------
+            // SECONDARY SEARCH
+            // ---------------------------------------------
 
             if (!scrollContainer) {
 
                 const allElements =
-                    contactsModal.querySelectorAll('*');
+                    modal.querySelectorAll('*');
 
                 let best = null;
                 let bestDifference = Infinity;
@@ -464,23 +389,23 @@
                         difference <
                         bestDifference
                     ) {
-
-                        best =
-                            element;
-
-                        bestDifference =
-                            difference;
+                        best = element;
+                        bestDifference = difference;
                     }
                 }
 
-                scrollContainer =
-                    best;
+                scrollContainer = best;
             }
 
+            // =================================================
+            // INITIAL VIEW MORE SCAN
+            // =================================================
 
-            // -------------------------------------------------
+            scanViewMore(modal);
+
+            // =================================================
             // SCROLL
-            // -------------------------------------------------
+            // =================================================
 
             if (scrollContainer) {
 
@@ -492,22 +417,10 @@
                     scrollContainer
                 );
 
-                console.log(
-                    'clientHeight:',
-                    scrollContainer.clientHeight
-                );
-
-                console.log(
-                    'scrollHeight:',
-                    scrollContainer.scrollHeight
-                );
-
-
                 let previousTop = -1;
                 let unchangedCount = 0;
 
                 const MAX_SCROLLS = 1000;
-
 
                 for (
                     let i = 0;
@@ -515,14 +428,7 @@
                     i++
                 ) {
 
-                    // -----------------------------------------
-                    // Collect visible members
-                    // -----------------------------------------
-
-                    collectMembersFromContainer(
-                        contactsModal
-                    );
-
+                    scanViewMore(modal);
 
                     const currentTop =
                         scrollContainer.scrollTop;
@@ -534,23 +440,8 @@
                             scrollContainer.clientHeight
                         );
 
-
                     // -----------------------------------------
-                    // Progress
-                    // -----------------------------------------
-
-                    if (
-                        i % 10 === 0
-                    ) {
-
-                        console.log(
-                            `Scroll ${i} | ${Math.round(currentTop)} / ${Math.round(maxTop)} | Unique members: ${memberNames.size}`
-                        );
-                    }
-
-
-                    // -----------------------------------------
-                    // Bottom reached
+                    // BOTTOM
                     // -----------------------------------------
 
                     if (
@@ -560,20 +451,13 @@
 
                         await sleep(300);
 
-                        collectMembersFromContainer(
-                            contactsModal
-                        );
-
-                        console.log(
-                            'Bottom reached.'
-                        );
+                        scanViewMore(modal);
 
                         break;
                     }
 
-
                     // -----------------------------------------
-                    // Detect movement
+                    // STUCK DETECTION
                     // -----------------------------------------
 
                     if (
@@ -582,20 +466,15 @@
                             previousTop
                         ) < 1
                     ) {
-
                         unchangedCount++;
-
                     } else {
-
                         unchangedCount = 0;
                     }
 
-                    previousTop =
-                        currentTop;
-
+                    previousTop = currentTop;
 
                     // -----------------------------------------
-                    // Normal jump
+                    // SCROLL
                     // -----------------------------------------
 
                     const viewport =
@@ -609,38 +488,23 @@
                             )
                         );
 
-
                     scrollContainer.scrollTop =
                         Math.min(
                             maxTop,
                             currentTop + jump
                         );
 
-
                     await sleep(120);
 
+                    scanViewMore(modal);
 
                     // -----------------------------------------
-                    // Collect again after rendering
-                    // -----------------------------------------
-
-                    collectMembersFromContainer(
-                        contactsModal
-                    );
-
-
-                    // -----------------------------------------
-                    // Force if stuck
+                    // FORCE IF STUCK
                     // -----------------------------------------
 
                     if (
                         unchangedCount >= 2
                     ) {
-
-                        console.log(
-                            'Normal scroll did not move. Forcing...'
-                        );
-
 
                         scrollContainer.scrollTop =
                             Math.min(
@@ -648,18 +512,15 @@
                                 currentTop + 1200
                             );
 
-
                         await sleep(200);
 
-
-                        collectMembersFromContainer(
-                            contactsModal
-                        );
-
+                        scanViewMore(modal);
 
                         unchangedCount = 0;
                     }
                 }
+
+                scanViewMore(modal);
 
             } else {
 
@@ -669,132 +530,21 @@
             }
         }
 
-
-    // =========================================================
-    // IF VIEW ALL DOES NOT EXIST
-    // =========================================================
-
     } else {
 
         console.log(
-            '============================================'
-        );
-
-        console.log(
-            'VIEW ALL NOT FOUND'
-        );
-
-        console.log(
-            'Using group-info-participants-section directly.'
-        );
-
-        console.log(
-            '============================================'
-        );
-
-
-        // -----------------------------------------------------
-        // USE THE EXACT SECTION YOU PROVIDED
-        // -----------------------------------------------------
-
-        const directSection =
-            document.querySelector(
-                '[data-testid="group-info-participants-section"]'
-            );
-
-
-        if (!directSection) {
-
-            console.error(
-                'Direct participants section not found.'
-            );
-
-        } else {
-
-            // -------------------------------------------------
-            // Collect all visible rows
-            // -------------------------------------------------
-
-            collectMembersFromContainer(
-                directSection
-            );
-
-
-            // -------------------------------------------------
-            // Extra direct row search
-            //
-            // This makes it work even if the list structure
-            // changes slightly.
-            // -------------------------------------------------
-
-            const directRows =
-                directSection.querySelectorAll(
-                    '[data-testid^="list-item-"]'
-                );
-
-
-            directRows.forEach(row => {
-
-                const nameElement =
-                    row.querySelector(
-                        '[data-testid="cell-frame-title"] span[dir="auto"]'
-                    );
-
-                if (!nameElement) return;
-
-                const name =
-                    nameElement.textContent
-                        .replace(/\s+/g, ' ')
-                        .trim();
-
-                if (!name) return;
-
-                addMember(
-                    name,
-                    row
-                );
-            });
-        }
-    }
-
-
-    // =========================================================
-    // FINAL COLLECTION
-    // =========================================================
-
-    collectMembersFromContainer(
-        document.querySelector(
-            '[data-testid="group-info-participants-section"]'
-        )
-    );
-
-
-    const contactsModalFinal =
-        document.querySelector(
-            '[data-testid="contacts-modal"]'
-        );
-
-    if (contactsModalFinal) {
-
-        collectMembersFromContainer(
-            contactsModalFinal
+            'View all not found.'
         );
     }
 
+    // =========================================================
+    // FINAL INITIAL SCAN
+    // =========================================================
+
+    scanInitial();
 
     // =========================================================
-    // FINAL ARRAYS
-    // =========================================================
-
-    const memberList =
-        [...memberNames.values()];
-
-    const adminList =
-        [...admins.values()];
-
-
-    // =========================================================
-    // GROUP OWNER
+    // OWNER
     // =========================================================
 
     let owner = null;
@@ -809,7 +559,6 @@
                     )
             );
 
-
     if (ownerElement) {
 
         const ownerText =
@@ -821,107 +570,59 @@
             );
 
         if (match) {
-            owner =
-                match[1].trim();
+            owner = match[1].trim();
         }
     }
 
-
     // =========================================================
-    // GIANT ADMIN STATUS LOG
+    // FINAL DATA
     // =========================================================
 
-    if (myMemberRow) {
+    const adminList =
+        [...admins.values()];
 
-        if (amIAdmin) {
+    const memberList = [
+        ...result.initial,
+        ...result.viewMore
+    ];
 
-            console.log(`
-╔════════════════════════════════════════════════════════════════════╗
-║                                                                    ║
-║                    █████╗ ██████╗ ███╗   ███╗██╗███╗   ██╗        ║
-║                   ██╔══██╗██╔══██╗████╗ ████║██║████╗  ██║        ║
-║                   ███████║██║  ██║██╔████╔██║██║██╔██╗ ██║        ║
-║                   ██╔══██║██║  ██║██║╚██╔╝██║██║██║╚██╗██║        ║
-║                   ██║  ██║██████╔╝██║ ╚═╝ ██║██║██║ ╚████║        ║
-║                   ╚═╝  ╚═╝╚═════╝ ╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝        ║
-║                                                                    ║
-║                    ✅  YOU ARE ADMIN  ✅                            ║
-║                                                                    ║
-║                     Admin status: TRUE                             ║
-║                                                                    ║
-╚════════════════════════════════════════════════════════════════════╝
-            `);
-
-            console.log(
-                '%c✅ YOU ARE ADMIN',
-                'font-size: 30px; font-weight: bold;'
-            );
-
-        } else {
-
-            console.log(`
-╔════════════════════════════════════════════════════════════════════╗
-║                                                                    ║
-║                  ███╗   ██╗ ██████╗ ████████╗                     ║
-║                  ████╗  ██║██╔═══██╗╚══██╔══╝                     ║
-║                  ██╔██╗ ██║██║   ██║   ██║                        ║
-║                  ██║╚██╗██║██║   ██║   ██║                        ║
-║                  ██║ ╚████║╚██████╔╝   ██║                        ║
-║                  ╚═╝  ╚═══╝ ╚═════╝    ╚═╝                        ║
-║                                                                    ║
-║                 ❌  YOU ARE NOT ADMIN  ❌                          ║
-║                                                                    ║
-║                     Admin status: FALSE                            ║
-║                                                                    ║
-╚════════════════════════════════════════════════════════════════════╝
-            `);
-
-            console.log(
-                '%c❌ YOU ARE NOT ADMIN',
-                'font-size: 30px; font-weight: bold;'
-            );
-        }
-
-    } else {
-
-        console.error(
-            '%c⚠️ COULD NOT DETERMINE YOUR ADMIN STATUS',
-            'font-size: 25px; font-weight: bold;'
-        );
-    }
-
-
-    // =========================================================
-    // FINAL DATA OBJECT
-    // =========================================================
+    const uniqueMemberList =
+        [...new Map(
+            memberList.map(name => [
+                name.toLocaleLowerCase(),
+                name
+            ])
+        ).values()];
 
     const data = {
 
-        groupName:
-            groupName,
+        groupName,
 
         members:
             memberCount,
 
         memberCountExtracted:
-            memberList.length,
+            uniqueMemberList.length,
 
         memberList:
-            memberList,
+            uniqueMemberList,
+
+        initial:
+            result.initial,
+
+        viewMore:
+            result.viewMore,
 
         admin:
             adminList,
 
-        owner:
-            owner,
+        owner,
 
-        amIAdmin:
-            amIAdmin
+        amIAdmin
     };
 
-
     // =========================================================
-    // FINAL OUTPUT
+    // OUTPUT
     // =========================================================
 
     console.log(
@@ -937,45 +638,7 @@
     );
 
     console.log(
-        'Group:',
-        groupName
-    );
-
-    console.log(
-        'WhatsApp member count:',
-        memberCount
-    );
-
-    console.log(
-        'Unique members extracted:',
-        memberList.length
-    );
-
-    console.log(
-        'Admins:',
-        adminList
-    );
-
-    console.log(
-        'Owner:',
-        owner
-    );
-
-    console.log(
-        'Am I admin:',
-        amIAdmin
-    );
-
-    console.log(
-        '========== UNIQUE MEMBER LIST =========='
-    );
-
-    console.log(
-        memberList
-    );
-
-    console.log(
-        '========== ACTUAL DATA OBJECT =========='
+        '========== ACTUAL JAVASCRIPT OBJECT =========='
     );
 
     console.log(data);
