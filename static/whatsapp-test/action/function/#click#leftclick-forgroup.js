@@ -5,6 +5,7 @@ function leftClick(action, memberName) {
     // leftClick("username")
     // leftClick("unadmin", "username")
     // leftClick("readmin", "username")
+    // leftClick("remuser", "username")
     // ============================================================
 
     if (memberName === undefined) {
@@ -107,13 +108,14 @@ function leftClick(action, memberName) {
 
     const menuText = {
         unadmin: 'Dismiss as admin',
-        readmin: 'Make group admin'
+        readmin: 'Make group admin',
+        remuser: 'Remove'
     }[action];
 
     if (!menuText) {
         console.error(
             `Unknown action "${action}". ` +
-            `Supported: unadmin, readmin`
+            `Supported: unadmin, readmin, remuser`
         );
         return;
     }
@@ -127,23 +129,6 @@ function leftClick(action, memberName) {
 
     const findAndClickMenuItem = () => {
         attempts++;
-
-        /*
-         * Specifically look for the span containing the
-         * exact menu text.
-         *
-         * This matches:
-         *
-         * <span class="x1o2sk6j ...">
-         *     Dismiss as admin
-         * </span>
-         *
-         * or:
-         *
-         * <span class="x1o2sk6j ...">
-         *     Make group admin
-         * </span>
-         */
 
         const candidates = [
             ...document.querySelectorAll('span')
@@ -177,12 +162,7 @@ function leftClick(action, memberName) {
             return;
         }
 
-        /*
-         * Use the smallest visible exact-text span.
-         * This helps avoid accidentally selecting a larger
-         * parent containing the same text.
-         */
-
+        // Smallest visible exact-text span
         const menuElement = candidates
             .sort((a, b) => {
                 const ar = a.getBoundingClientRect();
@@ -200,7 +180,7 @@ function leftClick(action, memberName) {
             menuElement
         );
 
-        // Click the exact span itself
+        // Click the menu span itself
         clickElement(menuElement);
 
         console.log(
@@ -214,4 +194,4 @@ function leftClick(action, memberName) {
         5
     );
 }
-leftClick("unadmin","~ Jasper");
+rightClick("remuser","oekoff")
