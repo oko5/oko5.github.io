@@ -200,7 +200,7 @@ function rightClick(action, memberName) {
             if (attempts < maxAttempts) {
                 setTimeout(
                     clickFirstMenuAction,
-                    10
+                    1
                 );
             } else {
                 console.error(
@@ -313,7 +313,7 @@ function rightClick(action, memberName) {
 
         setTimeout(
             findConfirmation,
-            10
+            1
         );
     };
 
@@ -393,7 +393,7 @@ function rightClick(action, memberName) {
 
         setTimeout(
             findRemoveConfirmation,
-            50
+            1
         );
     };
 
