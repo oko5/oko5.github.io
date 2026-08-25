@@ -1,23 +1,43 @@
 (() => {
-    const targetName = "Luke Totu"; // <-- CHANGE THIS
+    const targetName = "~Adrian";
 
-    const target = [...document.querySelectorAll(
-        '[data-testid="cell-frame-title"]'
-    )].find(el =>
-        el.querySelector(`span[title="${CSS.escape(targetName)}"]`)
-    );
+    const list = [...document.querySelectorAll('[role="list"]')]
+        .find(list =>
+            list.querySelector('[aria-label^="Members list:"]')
+        );
 
-    if (!target) {
-        console.error(`Target "${targetName}" not found`);
+    if (!list) {
+        console.error('Members role="list" not found');
         return;
     }
 
-    const rect = target.getBoundingClientRect();
+    const member = [...list.querySelectorAll('[role="listitem"]')]
+        .find(item =>
+            [...item.querySelectorAll('*')].some(el =>
+                el.getAttribute('title') === targetName
+            )
+        );
+
+    if (!member) {
+        console.error(`Member "${targetName}" not found`);
+        return;
+    }
+
+    // The actual name element
+    const nameElement = [...member.querySelectorAll('*')]
+        .find(el => el.getAttribute('title') === targetName);
+
+    if (!nameElement) {
+        console.error(`Name span "${targetName}" not found`);
+        return;
+    }
+
+    const rect = nameElement.getBoundingClientRect();
     const x = rect.left + rect.width / 2;
     const y = rect.top + rect.height / 2;
 
-    const dispatch = (type, button = 2, buttons = 0) => {
-        target.dispatchEvent(new MouseEvent(type, {
+    const dispatch = (type, button = 0, buttons = 0) => {
+        nameElement.dispatchEvent(new MouseEvent(type, {
             bubbles: true,
             cancelable: true,
             view: window,
@@ -31,11 +51,13 @@
         }));
     };
 
-    // Right-click sequence
-    dispatch('mouseenter', 0, 0);
-    dispatch('mouseover', 0, 0);
-    dispatch('mousemove', 0, 0);
+    // Right-click the NAME SPAN
+    dispatch('mouseenter');
+    dispatch('mouseover');
+    dispatch('mousemove');
     dispatch('mousedown', 2, 2);
     dispatch('mouseup', 2, 0);
     dispatch('contextmenu', 2, 0);
+
+    console.log('Right-clicked name span:', nameElement);
 })();
