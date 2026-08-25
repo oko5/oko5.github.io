@@ -200,7 +200,7 @@ function rightClick(action, memberName) {
             if (attempts < maxAttempts) {
                 setTimeout(
                     clickFirstMenuAction,
-                    100
+                    10
                 );
             } else {
                 console.error(
@@ -281,7 +281,7 @@ function rightClick(action, memberName) {
                 if (confirmAttempts < maxConfirmAttempts) {
                     setTimeout(
                         findConfirmation,
-                        50
+                        10
                     );
                 } else {
                     console.error(
@@ -313,7 +313,7 @@ function rightClick(action, memberName) {
 
         setTimeout(
             findConfirmation,
-            50
+            10
         );
     };
 
@@ -403,4 +403,4 @@ function rightClick(action, memberName) {
 
     clickFirstMenuAction();
 }
-rightClick("remuser","oekoff");
+rightClick("readmin","oekoff");
