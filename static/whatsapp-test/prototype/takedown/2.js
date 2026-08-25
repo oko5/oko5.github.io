@@ -7,46 +7,50 @@
 
     const ACTION = 'remuser';
 
-    // Delay between operations.
-    // Keep this low, but allow WhatsApp's React UI to update.
-    const MENU_WAIT = 20;
-    const UPDATE_WAIT = 50;
-    const SCROLL_WAIT = 50;
+    const MENU_WAIT = 25;
+    const UPDATE_WAIT = 75;
+    const SCROLL_WAIT = 75;
+
+    const MAX_ATTEMPTS_PER_USER = 2;
+    const MAX_OPERATIONS = 5000;
+    const MAX_SCROLL_ATTEMPTS = 2000;
 
     // ============================================================
     // SLEEP
     // ============================================================
 
     const sleep = ms =>
-        new Promise(resolve => setTimeout(resolve, ms));
+        new Promise(resolve =>
+            setTimeout(resolve, ms)
+        );
 
     // ============================================================
-    // FAST CLICK
+    // FAST LEFT CLICK
     // ============================================================
 
-    function dispatchClick(element) {
+    function clickElement(element) {
 
         if (!element) {
             return false;
         }
 
-        const r =
+        const rect =
             element.getBoundingClientRect();
 
         if (
-            !r.width ||
-            !r.height
+            !rect.width ||
+            !rect.height
         ) {
             return false;
         }
 
         const x =
-            r.left +
-            r.width / 2;
+            rect.left +
+            rect.width / 2;
 
         const y =
-            r.top +
-            r.height / 2;
+            rect.top +
+            rect.height / 2;
 
         const fire = (
             type,
@@ -77,9 +81,24 @@
         fire('mouseenter');
         fire('mouseover');
         fire('mousemove');
-        fire('mousedown', 0, 1);
-        fire('mouseup', 0, 0);
-        fire('click', 0, 0);
+
+        fire(
+            'mousedown',
+            0,
+            1
+        );
+
+        fire(
+            'mouseup',
+            0,
+            0
+        );
+
+        fire(
+            'click',
+            0,
+            0
+        );
 
         return true;
     }
@@ -93,7 +112,8 @@
         const elements =
             [...document.querySelectorAll('*')]
                 .filter(el =>
-                    el.textContent.trim() === text
+                    el.textContent
+                        .trim() === text
                 )
                 .filter(el => {
 
@@ -105,8 +125,10 @@
                         r.height > 0 &&
                         r.bottom >= 0 &&
                         r.right >= 0 &&
-                        r.top <= window.innerHeight &&
-                        r.left <= window.innerWidth
+                        r.top <=
+                            window.innerHeight &&
+                        r.left <=
+                            window.innerWidth
                     );
                 });
 
@@ -114,108 +136,110 @@
             return null;
         }
 
-        return elements.sort((a, b) => {
+        return elements.sort(
+            (a, b) => {
 
-            const ar =
-                a.getBoundingClientRect();
+                const ar =
+                    a.getBoundingClientRect();
 
-            const br =
-                b.getBoundingClientRect();
+                const br =
+                    b.getBoundingClientRect();
 
-            return (
-                ar.width * ar.height
-            ) - (
-                br.width * br.height
-            );
-
-        })[0];
+                return (
+                    ar.width *
+                    ar.height
+                ) - (
+                    br.width *
+                    br.height
+                );
+            }
+        )[0];
     }
 
     // ============================================================
-    // FIND MEMBER ELEMENT
+    // FIND MEMBER
     // ============================================================
 
     function findMemberElement(memberName) {
 
-        const exactTitle =
-            el =>
-                el.getAttribute('title') ===
-                memberName;
+        const titleMatches = [
+            ...document.querySelectorAll(
+                '[title]'
+            )
+        ].filter(el =>
+            el.getAttribute('title') ===
+            memberName
+        );
 
         // --------------------------------------------------------
-        // 1. Grid cells
+        // Prefer member-list elements
         // --------------------------------------------------------
-
-        const gridCells =
-            [
-                ...document.querySelectorAll(
-                    '[role="gridcell"]'
-                )
-            ];
-
-        let target =
-            gridCells.find(cell =>
-                [...cell.querySelectorAll('*')]
-                    .some(exactTitle)
-            );
-
-        if (target) {
-            return target;
-        }
-
-        // --------------------------------------------------------
-        // 2. List items
-        // --------------------------------------------------------
-
-        const listItems =
-            [
-                ...document.querySelectorAll(
-                    '[role="listitem"]'
-                )
-            ];
-
-        target =
-            listItems.find(item =>
-                [...item.querySelectorAll('*')]
-                    .some(exactTitle)
-            );
-
-        if (target) {
-            return target;
-        }
-
-        // --------------------------------------------------------
-        // 3. Members list
-        // --------------------------------------------------------
-
-        const memberLists =
-            [
-                ...document.querySelectorAll(
-                    '[aria-label^="Members list"]'
-                )
-            ];
 
         for (
-            const list of memberLists
+            const element of titleMatches
         ) {
 
-            const elements =
-                [
-                    ...list.querySelectorAll('*')
-                ];
-
-            const nameElement =
-                elements.find(exactTitle);
-
-            if (nameElement) {
-
-                return (
-                    nameElement.closest(
-                        '[role="listitem"],' +
-                        '[role="gridcell"]'
-                    ) ||
-                    nameElement
+            const memberContainer =
+                element.closest(
+                    '[role="listitem"],' +
+                    '[role="gridcell"]'
                 );
+
+            if (
+                memberContainer &&
+                (
+                    memberContainer.closest(
+                        '[aria-label^="Members list"]'
+                    ) ||
+                    memberContainer.closest(
+                        '[data-testid="contacts-modal"]'
+                    ) ||
+                    memberContainer.closest(
+                        '[role="dialog"]'
+                    )
+                )
+            ) {
+
+                return {
+                    container:
+                        memberContainer,
+
+                    nameElement:
+                        element
+                };
+            }
+        }
+
+        // --------------------------------------------------------
+        // Fallback
+        // --------------------------------------------------------
+
+        for (
+            const element of titleMatches
+        ) {
+
+            const rect =
+                element.getBoundingClientRect();
+
+            if (
+                rect.width &&
+                rect.height &&
+                rect.bottom >= 0 &&
+                rect.top <=
+                    window.innerHeight
+            ) {
+
+                return {
+                    container:
+                        element.closest(
+                            '[role="listitem"],' +
+                            '[role="gridcell"]'
+                        ) ||
+                        element,
+
+                    nameElement:
+                        element
+                };
             }
         }
 
@@ -224,8 +248,6 @@
 
     // ============================================================
     // LEFT CLICK
-    //
-    // SUPPORT:
     //
     // leftClick("username")
     // leftClick("remuser", "username")
@@ -239,7 +261,7 @@
     ) {
 
         // --------------------------------------------------------
-        // leftClick("username")
+        // SUPPORT leftClick("username")
         // --------------------------------------------------------
 
         if (
@@ -254,54 +276,29 @@
         // FIND MEMBER
         // --------------------------------------------------------
 
-        const target =
+        const found =
             findMemberElement(
                 memberName
             );
 
-        if (!target) {
+        if (!found) {
 
             console.warn(
-                `Member "${memberName}" not found`
+                `Member "${memberName}" does not exist or is not visible.`
             );
 
             return false;
         }
-
-        // --------------------------------------------------------
-        // FIND NAME ELEMENT
-        // --------------------------------------------------------
 
         const nameElement =
-            [
-                ...target.querySelectorAll('*')
-            ]
-            .find(el =>
-                el.getAttribute('title') ===
-                memberName
-            ) ||
-            (
-                target.getAttribute('title') ===
-                memberName
-                    ? target
-                    : null
-            );
-
-        if (!nameElement) {
-
-            console.warn(
-                `Name element "${memberName}" not found`
-            );
-
-            return false;
-        }
+            found.nameElement;
 
         // --------------------------------------------------------
-        // MEMBER CLICK
+        // CLICK MEMBER
         // --------------------------------------------------------
 
         if (
-            !dispatchClick(
+            !clickElement(
                 nameElement
             )
         ) {
@@ -310,18 +307,21 @@
         }
 
         console.log(
-            'Clicked:',
+            'Clicked member:',
             memberName
         );
 
-        // No action requested.
+        // --------------------------------------------------------
+        // NO ACTION
+        // --------------------------------------------------------
+
         if (!action) {
             return true;
         }
 
-        // --------------------------------------------------------
-        // ACTION TEXT
-        // --------------------------------------------------------
+        // ========================================================
+        // ACTION MENU
+        // ========================================================
 
         const menuText = {
 
@@ -339,22 +339,22 @@
         if (!menuText) {
 
             console.error(
-                `Unknown action "${action}"`
+                `Unknown action "${action}".`
             );
 
             return false;
         }
 
-        // --------------------------------------------------------
+        // ========================================================
         // WAIT FOR MENU
-        // --------------------------------------------------------
+        // ========================================================
 
         let menuElement = null;
 
         for (
-            let i = 0;
-            i < 20;
-            i++
+            let attempt = 0;
+            attempt < 20;
+            attempt++
         ) {
 
             menuElement =
@@ -366,23 +366,25 @@
                 break;
             }
 
-            await sleep(MENU_WAIT);
+            await sleep(
+                MENU_WAIT
+            );
         }
 
         if (!menuElement) {
 
             console.warn(
-                `"${menuText}" not found for "${memberName}"`
+                `"${menuText}" menu item not found for "${memberName}".`
             );
 
             return false;
         }
 
-        // --------------------------------------------------------
-        // CLICK MENU CONTAINER
-        // --------------------------------------------------------
+        // ========================================================
+        // CLICK MENU ITEM
+        // ========================================================
 
-        const menuClickable =
+        const menuButton =
             menuElement.closest(
                 '[role="menuitem"],' +
                 '[role="option"],' +
@@ -391,36 +393,45 @@
             menuElement.parentElement ||
             menuElement;
 
-        dispatchClick(
-            menuClickable
-        );
+        if (
+            !clickElement(
+                menuButton
+            )
+        ) {
+
+            return false;
+        }
 
         console.log(
-            `Clicked "${menuText}" for "${memberName}"`
+            `Clicked "${menuText}" for "${memberName}".`
         );
 
-        // --------------------------------------------------------
+        // ========================================================
         // REMOVE CONFIRMATION
-        // --------------------------------------------------------
+        // ========================================================
 
         if (
             action === 'remuser'
         ) {
 
-            let removeButton = null;
+            let confirmation =
+                null;
 
             for (
-                let i = 0;
-                i < 30;
-                i++
+                let attempt = 0;
+                attempt < 30;
+                attempt++
             ) {
 
                 const candidates =
                     [
-                        ...document.querySelectorAll('*')
+                        ...document.querySelectorAll(
+                            '*'
+                        )
                     ]
                     .filter(el =>
-                        el.textContent.trim() ===
+                        el.textContent
+                            .trim() ===
                         'Remove'
                     )
                     .filter(el => {
@@ -440,63 +451,122 @@
                         );
                     });
 
-                // Prefer elements inside a dialog.
-                removeButton =
-                    candidates.find(el =>
-                        el.closest(
-                            '[role="dialog"]'
-                        )
-                    ) ||
-                    candidates.find(el =>
-                        el.closest(
-                            '[role="button"]'
-                        )
-                    ) ||
-                    candidates[0];
+                // Prefer dialog confirmation.
+                confirmation =
+                    candidates.find(
+                        el =>
+                            el.closest(
+                                '[role="dialog"]'
+                            )
+                    );
 
-                if (removeButton) {
+                if (!confirmation) {
+
+                    confirmation =
+                        candidates.find(
+                            el =>
+                                el.closest(
+                                    '[role="button"]'
+                                )
+                        );
+                }
+
+                if (!confirmation) {
+                    confirmation =
+                        candidates[0];
+                }
+
+                if (confirmation) {
                     break;
                 }
 
-                await sleep(MENU_WAIT);
+                await sleep(
+                    MENU_WAIT
+                );
             }
 
-            if (!removeButton) {
+            if (!confirmation) {
 
                 console.warn(
-                    `Remove confirmation not found for "${memberName}"`
+                    `Remove confirmation not found for "${memberName}".`
                 );
 
                 return false;
             }
 
-            const clickable =
-                removeButton.closest(
+            const confirmButton =
+                confirmation.closest(
                     '[role="button"],' +
                     '[role="menuitem"],' +
                     '[role="option"]'
                 ) ||
-                removeButton.parentElement ||
-                removeButton;
+                confirmation.parentElement ||
+                confirmation;
 
-            dispatchClick(
-                clickable
-            );
+            if (
+                !clickElement(
+                    confirmButton
+                )
+            ) {
+
+                return false;
+            }
 
             console.log(
-                `REMOVED: ${memberName}`
+                `Confirmed REMOVE for "${memberName}".`
             );
 
             await sleep(
                 UPDATE_WAIT
             );
 
-            return true;
+            // ----------------------------------------------------
+            // Verify member disappeared.
+            // ----------------------------------------------------
+
+            const stillThere =
+                findMemberElement(
+                    memberName
+                );
+
+            if (!stillThere) {
+
+                console.log(
+                    `Verified removed: "${memberName}".`
+                );
+
+                return true;
+            }
+
+            // WhatsApp may need another React update.
+            await sleep(
+                UPDATE_WAIT
+            );
+
+            const stillThereAgain =
+                findMemberElement(
+                    memberName
+                );
+
+            if (!stillThereAgain) {
+
+                console.log(
+                    `Verified removed after update: "${memberName}".`
+                );
+
+                return true;
+            }
+
+            console.warn(
+                `"${memberName}" still appears in the DOM.`
+            );
+
+            return false;
         }
 
-        // --------------------------------------------------------
-        // READMIN CONFIRMATION
-        // --------------------------------------------------------
+        // ========================================================
+        // READMIN
+        // ========================================================
 
         if (
             action === 'readmin'
@@ -511,7 +581,7 @@
                 return false;
             }
 
-            const clickable =
+            const button =
                 confirmation.closest(
                     '[role="button"],' +
                     '[role="menuitem"],' +
@@ -520,22 +590,22 @@
                 confirmation.parentElement ||
                 confirmation;
 
-            dispatchClick(
-                clickable
+            clickElement(
+                button
             );
 
             return true;
         }
 
-        // --------------------------------------------------------
+        // ========================================================
         // UNADMIN
-        // --------------------------------------------------------
+        // ========================================================
 
         return true;
     }
 
     // ============================================================
-    // OPEN GROUP INFO
+    // OPEN GROUP INFORMATION
     // ============================================================
 
     const header =
@@ -553,7 +623,8 @@
     }
 
     const headerButton =
-        header.firstElementChild?.children[1];
+        header.firstElementChild
+            ?.children[1];
 
     if (!headerButton) {
 
@@ -564,7 +635,7 @@
         return;
     }
 
-    dispatchClick(
+    clickElement(
         headerButton
     );
 
@@ -576,21 +647,17 @@
 
     function findViewAll() {
 
-        const elements =
-            [
-                ...document.querySelectorAll('*')
-            ];
-
-        return elements.find(el => {
+        return [
+            ...document.querySelectorAll('*')
+        ].find(el => {
 
             const text =
                 el.textContent
                     .replace(/\s+/g, ' ')
                     .trim();
 
-            return /^View all \(\d+ more\)$/i.test(
-                text
-            );
+            return /^View all \(\d+ more\)$/i
+                .test(text);
         });
     }
 
@@ -598,14 +665,25 @@
         findViewAll();
 
     // ============================================================
-    // IF VIEW ALL EXISTS → OPEN IT
+    // OPEN VIEW ALL IF PRESENT
     // ============================================================
 
     if (viewAll) {
 
         console.log(
-            'View all detected:',
+            '============================================'
+        );
+
+        console.log(
+            'VIEW ALL FOUND'
+        );
+
+        console.log(
             viewAll.textContent.trim()
+        );
+
+        console.log(
+            '============================================'
         );
 
         const button =
@@ -614,19 +692,20 @@
             ) ||
             viewAll;
 
-        dispatchClick(
+        clickElement(
             button
         );
 
-        await sleep(400);
+        await sleep(500);
 
         console.log(
             'View all opened.'
         );
+
     } else {
 
         console.log(
-            'No View all button.'
+            'View all not found. Using current member list.'
         );
     }
 
@@ -689,13 +768,13 @@
             }
 
             for (
-                const child of
+                const element of
                 root.querySelectorAll('*')
             ) {
 
                 const style =
                     getComputedStyle(
-                        child
+                        element
                     );
 
                 const overflow =
@@ -707,18 +786,17 @@
                         overflow === 'scroll' ||
                         overflow === 'overlay'
                     ) &&
-                    child.scrollHeight >
-                        child.clientHeight
+                    element.scrollHeight >
+                        element.clientHeight
                 ) {
 
                     candidates.push(
-                        child
+                        element
                     );
                 }
             }
         }
 
-        // Remove duplicates.
         const unique =
             [...new Set(candidates)];
 
@@ -736,548 +814,374 @@
     }
 
     // ============================================================
-    // FIND CURRENT REMOVABLE MEMBER
+    // CONFIRMATIONS
     // ============================================================
 
-    function findCurrentMember() {
+    if (!window.confirm(
+        'MASS MEMBER REMOVAL\n\n' +
+        'The script will remove members from this group.\n\n' +
+        'Each individual member gets a maximum of 2 attempts.\n\n' +
+        'Already removed/non-existent members will be skipped.\n\n' +
+        'Continue?'
+    )) {
 
-        const containers = [
-            ...document.querySelectorAll(
-                '[aria-label^="Members list"]'
-            ),
-            ...document.querySelectorAll(
-                '[data-testid="contacts-modal"]'
-            ),
-            ...document.querySelectorAll(
-                '[role="dialog"]'
-            )
-        ];
-
-        const items = [];
-
-        for (
-            const container of containers
-        ) {
-
-            items.push(
-                ...container.querySelectorAll(
-                    '[role="listitem"],' +
-                    '[role="gridcell"]'
-                )
-            );
-        }
-
-        const uniqueItems =
-            [...new Set(items)];
-
-        for (
-            const item of uniqueItems
-        ) {
-
-            const nameElement =
-                [
-                    ...item.querySelectorAll('*')
-                ].find(el =>
-                    el.getAttribute('title')
-                );
-
-            if (!nameElement) {
-                continue;
-            }
-
-            let name =
-                nameElement
-                    .getAttribute('title')
-                    ?.trim();
-
-            if (!name) {
-                continue;
-            }
-
-            // ----------------------------------------------------
-            // Ignore obvious non-members
-            // ----------------------------------------------------
-
-            if (
-                name === 'You' ||
-                name === 'Add participants'
-            ) {
-                continue;
-            }
-
-            const r =
-                nameElement.getBoundingClientRect();
-
-            if (
-                !r.width ||
-                !r.height ||
-                r.bottom < 0 ||
-                r.top > window.innerHeight
-            ) {
-                continue;
-            }
-
-            return {
-                name,
-                element: nameElement
-            };
-        }
-
-        return null;
-    }
-
-// ============================================================
-// MASS REMOVAL
-// ============================================================
-
-let removed = 0;
-let skipped = 0;
-let failed = 0;
-
-const MAX_ATTEMPTS_PER_USER = 2;
-const MAX_OPERATIONS = 5000;
-const MAX_SCROLL_ATTEMPTS = 2000;
-
-// Track attempts independently for every member.
-const removalAttempts = new Map();
-
-// Track members already successfully processed.
-const removedNames = new Set();
-
-console.log(
-    '============================================'
-);
-
-console.log(
-    'MASS REMOVAL READY'
-);
-
-console.log(
-    '============================================'
-);
-
-// ============================================================
-// CONFIRMATION 1
-// ============================================================
-
-if (!window.confirm(
-    'MASS REMOVAL\n\n' +
-    'The script will remove members from this group.\n\n' +
-    'Each member will receive a maximum of 2 removal attempts.\n\n' +
-    'Continue?'
-)) {
-
-    console.log(
-        'STOPPED: Confirmation 1.'
-    );
-
-    return;
-}
-
-// ============================================================
-// CONFIRMATION 2
-// ============================================================
-
-if (!window.confirm(
-    'CONFIRMATION 2 OF 3\n\n' +
-    'The script will automatically process the member list.\n\n' +
-    'If a member is already removed or cannot be found, ' +
-    'the script will skip that member and continue.\n\n' +
-    'Continue?'
-)) {
-
-    console.log(
-        'STOPPED: Confirmation 2.'
-    );
-
-    return;
-}
-
-// ============================================================
-// CONFIRMATION 3
-// ============================================================
-
-if (!window.confirm(
-    'FINAL CONFIRMATION 3 OF 3\n\n' +
-    'START MASS REMOVAL NOW?\n\n' +
-    'Maximum attempts per member: 2'
-)) {
-
-    console.log(
-        'STOPPED: Confirmation 3.'
-    );
-
-    return;
-}
-
-console.log(
-    'CONFIRMED. STARTING MASS REMOVAL...'
-);
-
-// ============================================================
-// GET MEMBER ATTEMPTS
-// ============================================================
-
-function getAttempts(name) {
-
-    const key =
-        name.toLocaleLowerCase();
-
-    return removalAttempts.get(key) || 0;
-}
-
-// ============================================================
-// INCREMENT MEMBER ATTEMPT
-// ============================================================
-
-function incrementAttempt(name) {
-
-    const key =
-        name.toLocaleLowerCase();
-
-    const current =
-        removalAttempts.get(key) || 0;
-
-    const next =
-        current + 1;
-
-    removalAttempts.set(
-        key,
-        next
-    );
-
-    return next;
-}
-
-// ============================================================
-// FIND CURRENT VISIBLE MEMBER
-// ============================================================
-
-function findCurrentMember() {
-
-    const containers = [
-        ...document.querySelectorAll(
-            '[aria-label^="Members list"]'
-        ),
-        ...document.querySelectorAll(
-            '[data-testid="contacts-modal"]'
-        ),
-        ...document.querySelectorAll(
-            '[role="dialog"]'
-        )
-    ];
-
-    const items = [];
-
-    for (
-        const container of containers
-    ) {
-
-        items.push(
-            ...container.querySelectorAll(
-                '[role="listitem"],' +
-                '[role="gridcell"]'
-            )
+        console.log(
+            'STOPPED: Confirmation 1.'
         );
+
+        return;
     }
 
-    const uniqueItems =
-        [...new Set(items)];
+    if (!window.confirm(
+        'CONFIRMATION 2 OF 3\n\n' +
+        'The script will automatically process the member list.\n\n' +
+        'Maximum attempts per member: 2\n' +
+        'Failed members will be skipped.'
+    )) {
 
-    for (
-        const item of uniqueItems
+        console.log(
+            'STOPPED: Confirmation 2.'
+        );
+
+        return;
+    }
+
+    if (!window.confirm(
+        'FINAL CONFIRMATION 3 OF 3\n\n' +
+        'START MASS REMOVAL NOW?\n\n' +
+        '2 attempts maximum per member.'
+    )) {
+
+        console.log(
+            'STOPPED: Confirmation 3.'
+        );
+
+        return;
+    }
+
+    // ============================================================
+    // TRACKING
+    // ============================================================
+
+    const attempts =
+        new Map();
+
+    const completed =
+        new Set();
+
+    const permanentlySkipped =
+        new Set();
+
+    let removed = 0;
+    let failed = 0;
+    let skipped = 0;
+
+    let operations = 0;
+    let scrollAttempts = 0;
+    let noMemberCount = 0;
+
+    // ============================================================
+    // GET ATTEMPTS
+    // ============================================================
+
+    function getAttempts(name) {
+
+        return attempts.get(
+            name.toLocaleLowerCase()
+        ) || 0;
+    }
+
+    // ============================================================
+    // RECORD ATTEMPT
+    // ============================================================
+
+    function recordAttempt(name) {
+
+        const key =
+            name.toLocaleLowerCase();
+
+        const value =
+            getAttempts(name) + 1;
+
+        attempts.set(
+            key,
+            value
+        );
+
+        return value;
+    }
+
+    // ============================================================
+    // MAIN REMOVAL LOOP
+    // ============================================================
+
+    console.log(
+        '============================================'
+    );
+
+    console.log(
+        'STARTING MASS REMOVAL'
+    );
+
+    console.log(
+        '============================================'
+    );
+
+    while (
+        operations <
+            MAX_OPERATIONS
     ) {
 
-        const nameElement =
-            [
-                ...item.querySelectorAll('*')
-            ].find(el =>
-                el.getAttribute('title')
+        // --------------------------------------------------------
+        // FIND NEXT MEMBER
+        // --------------------------------------------------------
+
+        const member =
+            (() => {
+
+                const containers = [
+                    ...document.querySelectorAll(
+                        '[aria-label^="Members list"]'
+                    ),
+                    ...document.querySelectorAll(
+                        '[data-testid="contacts-modal"]'
+                    ),
+                    ...document.querySelectorAll(
+                        '[role="dialog"]'
+                    )
+                ];
+
+                const seenElements =
+                    new Set();
+
+                for (
+                    const container of containers
+                ) {
+
+                    const items =
+                        container.querySelectorAll(
+                            '[role="listitem"],' +
+                            '[role="gridcell"]'
+                        );
+
+                    for (
+                        const item of items
+                    ) {
+
+                        if (
+                            seenElements.has(item)
+                        ) {
+                            continue;
+                        }
+
+                        seenElements.add(item);
+
+                        const nameElement =
+                            [
+                                ...item.querySelectorAll(
+                                    '[title]'
+                                )
+                            ].find(el =>
+                                el.getAttribute(
+                                    'title'
+                                )
+                            );
+
+                        if (!nameElement) {
+                            continue;
+                        }
+
+                        const name =
+                            nameElement
+                                .getAttribute(
+                                    'title'
+                                )
+                                ?.replace(
+                                    /\s+/g,
+                                    ' '
+                                )
+                                .trim();
+
+                        if (!name) {
+                            continue;
+                        }
+
+                        const key =
+                            name.toLocaleLowerCase();
+
+                        // Never process yourself.
+                        if (
+                            key === 'you'
+                        ) {
+                            continue;
+                        }
+
+                        // Already completed.
+                        if (
+                            completed.has(key)
+                        ) {
+                            continue;
+                        }
+
+                        // Already permanently skipped.
+                        if (
+                            permanentlySkipped.has(
+                                key
+                            )
+                        ) {
+                            continue;
+                        }
+
+                        // Two attempts already used.
+                        if (
+                            getAttempts(name) >=
+                            MAX_ATTEMPTS_PER_USER
+                        ) {
+
+                            permanentlySkipped.add(
+                                key
+                            );
+
+                            skipped++;
+
+                            console.warn(
+                                `SKIP "${name}" — maximum attempts reached.`
+                            );
+
+                            continue;
+                        }
+
+                        const rect =
+                            nameElement
+                                .getBoundingClientRect();
+
+                        if (
+                            !rect.width ||
+                            !rect.height ||
+                            rect.bottom < 0 ||
+                            rect.top >
+                                window.innerHeight ||
+                            rect.right < 0 ||
+                            rect.left >
+                                window.innerWidth
+                        ) {
+                            continue;
+                        }
+
+                        return {
+                            name,
+                            key
+                        };
+                    }
+                }
+
+                return null;
+            })();
+
+        // ========================================================
+        // MEMBER FOUND
+        // ========================================================
+
+        if (member) {
+
+            noMemberCount = 0;
+            scrollAttempts = 0;
+
+            const name =
+                member.name;
+
+            const key =
+                member.key;
+
+            const attempt =
+                recordAttempt(name);
+
+            operations++;
+
+            console.log(
+                '--------------------------------------------'
             );
 
-        if (!nameElement) {
-            continue;
-        }
+            console.log(
+                `USER: ${name}`
+            );
 
-        let name =
-            nameElement
-                .getAttribute('title')
-                ?.replace(/\s+/g, ' ')
-                .trim();
+            console.log(
+                `ATTEMPT: ${attempt}/${MAX_ATTEMPTS_PER_USER}`
+            );
 
-        if (!name) {
-            continue;
-        }
+            // ----------------------------------------------------
+            // REMOVE
+            // ----------------------------------------------------
 
-        // --------------------------------------------------------
-        // NEVER REMOVE YOURSELF
-        // --------------------------------------------------------
-
-        if (
-            name.toLocaleLowerCase() ===
-            'you'
-        ) {
-            continue;
-        }
-
-        // --------------------------------------------------------
-        // ALREADY SUCCESSFULLY REMOVED
-        // --------------------------------------------------------
-
-        if (
-            removedNames.has(
-                name.toLocaleLowerCase()
-            )
-        ) {
-            continue;
-        }
-
-        // --------------------------------------------------------
-        // TWO ATTEMPTS ALREADY USED
-        // --------------------------------------------------------
-
-        if (
-            getAttempts(name) >=
-            MAX_ATTEMPTS_PER_USER
-        ) {
-            continue;
-        }
-
-        // --------------------------------------------------------
-        // VISIBLE?
-        // --------------------------------------------------------
-
-        const r =
-            nameElement.getBoundingClientRect();
-
-        if (
-            !r.width ||
-            !r.height ||
-            r.bottom < 0 ||
-            r.top > window.innerHeight ||
-            r.right < 0 ||
-            r.left > window.innerWidth
-        ) {
-            continue;
-        }
-
-        return {
-            name,
-            element: nameElement
-        };
-    }
-
-    return null;
-}
-
-// ============================================================
-// FIND MEMBERS SCROLLER
-// ============================================================
-
-function findMemberScroller() {
-
-    const roots = [
-        ...document.querySelectorAll(
-            '[aria-label^="Members list"]'
-        ),
-        ...document.querySelectorAll(
-            '[data-testid="contacts-modal"]'
-        ),
-        ...document.querySelectorAll(
-            '[role="dialog"]'
-        )
-    ];
-
-    const candidates = [];
-
-    for (
-        const root of roots
-    ) {
-
-        let current = root;
-
-        while (
-            current &&
-            current !== document.body
-        ) {
-
-            const style =
-                getComputedStyle(
-                    current
+            const success =
+                await leftClick(
+                    ACTION,
+                    name
                 );
 
-            const overflow =
-                style.overflowY;
+            // ----------------------------------------------------
+            // SUCCESS
+            // ----------------------------------------------------
 
-            if (
-                (
-                    overflow === 'auto' ||
-                    overflow === 'scroll' ||
-                    overflow === 'overlay'
-                ) &&
-                current.scrollHeight >
-                    current.clientHeight
-            ) {
+            if (success) {
 
-                candidates.push(
-                    current
+                completed.add(
+                    key
                 );
+
+                removed++;
+
+                console.log(
+                    `SUCCESS → ${name}`
+                );
+
+                await sleep(
+                    UPDATE_WAIT
+                );
+
+                continue;
             }
 
-            current =
-                current.parentElement;
-        }
-
-        for (
-            const child of
-            root.querySelectorAll('*')
-        ) {
-
-            const style =
-                getComputedStyle(
-                    child
-                );
-
-            const overflow =
-                style.overflowY;
-
-            if (
-                (
-                    overflow === 'auto' ||
-                    overflow === 'scroll' ||
-                    overflow === 'overlay'
-                ) &&
-                child.scrollHeight >
-                    child.clientHeight
-            ) {
-
-                candidates.push(
-                    child
-                );
-            }
-        }
-    }
-
-    const unique =
-        [...new Set(candidates)];
-
-    return unique.sort(
-        (a, b) =>
-            (
-                b.scrollHeight -
-                b.clientHeight
-            ) -
-            (
-                a.scrollHeight -
-                a.clientHeight
-            )
-    )[0] || null;
-}
-
-// ============================================================
-// MASS PROCESS LOOP
-// ============================================================
-
-let operationCount = 0;
-let scrollAttempts = 0;
-let emptyAttempts = 0;
-
-while (
-    operationCount <
-        MAX_OPERATIONS &&
-    scrollAttempts <
-        MAX_SCROLL_ATTEMPTS
-) {
-
-    // ----------------------------------------------------------
-    // FIND NEXT MEMBER
-    // ----------------------------------------------------------
-
-    const member =
-        findCurrentMember();
-
-    // ----------------------------------------------------------
-    // MEMBER FOUND
-    // ----------------------------------------------------------
-
-    if (member) {
-
-        emptyAttempts = 0;
-        scrollAttempts = 0;
-
-        const name =
-            member.name;
-
-        const attemptsBefore =
-            getAttempts(name);
-
-        // ------------------------------------------------------
-        // SAFETY
-        // ------------------------------------------------------
-
-        if (
-            attemptsBefore >=
-            MAX_ATTEMPTS_PER_USER
-        ) {
-
-            skipped++;
+            // ----------------------------------------------------
+            // FAILED
+            // ----------------------------------------------------
 
             console.warn(
-                `SKIP: "${name}" already reached ` +
-                `${MAX_ATTEMPTS_PER_USER} attempts.`
-            );
-
-            continue;
-        }
-
-        // ------------------------------------------------------
-        // ATTEMPT
-        // ------------------------------------------------------
-
-        const attempt =
-            incrementAttempt(name);
-
-        operationCount++;
-
-        console.log(
-            '--------------------------------------------'
-        );
-
-        console.log(
-            `Processing: ${name}`
-        );
-
-        console.log(
-            `Attempt ${attempt}/${MAX_ATTEMPTS_PER_USER}`
-        );
-
-        // ------------------------------------------------------
-        // TRY REMOVAL
-        // ------------------------------------------------------
-
-        const success =
-            await leftClick(
-                'remuser',
+                `FAILED ATTEMPT ${attempt}/${MAX_ATTEMPTS_PER_USER}:`,
                 name
             );
 
-        // ------------------------------------------------------
-        // SUCCESS
-        // ------------------------------------------------------
+            // ----------------------------------------------------
+            // MAX 2 ATTEMPTS
+            // ----------------------------------------------------
 
-        if (success) {
+            if (
+                attempt >=
+                MAX_ATTEMPTS_PER_USER
+            ) {
 
-            removedNames.add(
-                name.toLocaleLowerCase()
-            );
+                permanentlySkipped.add(
+                    key
+                );
 
-            removed++;
+                failed++;
 
-            console.log(
-                `SUCCESS: "${name}" removed.`
-            );
+                console.warn(
+                    `SKIPPING "${name}" after 2 attempts.`
+                );
 
-            // Allow React/WhatsApp to update.
+                await sleep(
+                    UPDATE_WAIT
+                );
+
+                continue;
+            }
+
+            // ----------------------------------------------------
+            // ALLOW UI TO UPDATE BEFORE SECOND ATTEMPT
+            // ----------------------------------------------------
+
             await sleep(
                 UPDATE_WAIT
             );
@@ -1285,217 +1189,180 @@ while (
             continue;
         }
 
-        // ------------------------------------------------------
-        // FAILURE
-        // ------------------------------------------------------
+        // ========================================================
+        // NO VISIBLE MEMBER
+        // ========================================================
 
-        console.warn(
-            `Attempt ${attempt} failed for "${name}".`
-        );
+        noMemberCount++;
 
-        // ------------------------------------------------------
-        // SECOND ATTEMPT
-        // ------------------------------------------------------
+        const scroller =
+            findMemberScroller();
 
-        if (
-            attempt >=
-            MAX_ATTEMPTS_PER_USER
-        ) {
+        if (!scroller) {
 
-            failed++;
+            if (
+                noMemberCount >= 8
+            ) {
 
-            console.warn(
-                `SKIP: "${name}" failed ` +
-                `${MAX_ATTEMPTS_PER_USER} times.`
+                console.log(
+                    'No member list/scroller found.'
+                );
+
+                break;
+            }
+
+            await sleep(
+                UPDATE_WAIT
             );
 
             continue;
         }
 
-        // ------------------------------------------------------
-        // MEMBER MAY HAVE DISAPPEARED DURING FIRST ATTEMPT
-        // ------------------------------------------------------
+        // ========================================================
+        // SCROLL
+        // ========================================================
 
-        await sleep(
-            UPDATE_WAIT
-        );
-
-        // Try the same member again.
-        continue;
-    }
-
-    // ----------------------------------------------------------
-    // NO MEMBER CURRENTLY VISIBLE
-    // ----------------------------------------------------------
-
-    emptyAttempts++;
-
-    const scroller =
-        findMemberScroller();
-
-    if (!scroller) {
-
-        if (
-            emptyAttempts >= 8
-        ) {
-
-            console.log(
-                'No member found and no member scroller available.'
-            );
-
-            break;
-        }
-
-        await sleep(
-            UPDATE_WAIT
-        );
-
-        continue;
-    }
-
-    // ----------------------------------------------------------
-    // SCROLL
-    // ----------------------------------------------------------
-
-    const maxTop =
-        Math.max(
-            0,
-            scroller.scrollHeight -
-            scroller.clientHeight
-        );
-
-    const oldTop =
-        scroller.scrollTop;
-
-    // ----------------------------------------------------------
-    // AT BOTTOM
-    // ----------------------------------------------------------
-
-    if (
-        oldTop >=
-        maxTop - 3
-    ) {
-
-        // Give virtualized list a chance to render.
-        await sleep(
-            SCROLL_WAIT
-        );
-
-        // Slightly move upward.
-        scroller.scrollTop =
+        const maxTop =
             Math.max(
                 0,
-                oldTop - 200
+                scroller.scrollHeight -
+                scroller.clientHeight
             );
 
-        await sleep(
-            SCROLL_WAIT
-        );
+        const currentTop =
+            scroller.scrollTop;
 
-        // Then return to bottom.
+        // --------------------------------------------------------
+        // AT BOTTOM
+        // --------------------------------------------------------
+
+        if (
+            currentTop >=
+            maxTop - 3
+        ) {
+
+            // Let the virtualized list update.
+            await sleep(
+                SCROLL_WAIT
+            );
+
+            // Small upward movement.
+            scroller.scrollTop =
+                Math.max(
+                    0,
+                    currentTop - 250
+                );
+
+            await sleep(
+                SCROLL_WAIT
+            );
+
+            // Return to bottom.
+            scroller.scrollTop =
+                maxTop;
+
+            await sleep(
+                SCROLL_WAIT
+            );
+
+            scrollAttempts++;
+
+            if (
+                scrollAttempts >= 10
+            ) {
+
+                console.log(
+                    'Reached the end of the member list.'
+                );
+
+                break;
+            }
+
+            continue;
+        }
+
+        // --------------------------------------------------------
+        // NORMAL SCROLL
+        // --------------------------------------------------------
+
+        const jump =
+            Math.max(
+                250,
+                Math.floor(
+                    scroller.clientHeight *
+                    0.85
+                )
+            );
+
         scroller.scrollTop =
-            maxTop;
+            Math.min(
+                maxTop,
+                currentTop + jump
+            );
 
         await sleep(
             SCROLL_WAIT
         );
 
         scrollAttempts++;
-
-        if (
-            scrollAttempts >= 10
-        ) {
-
-            console.log(
-                'No further members detected at bottom.'
-            );
-
-            break;
-        }
-
-        continue;
     }
 
-    // ----------------------------------------------------------
-    // NORMAL SCROLL
-    // ----------------------------------------------------------
+    // ============================================================
+    // FINAL REPORT
+    // ============================================================
 
-    const jump =
-        Math.max(
-            250,
-            Math.floor(
-                scroller.clientHeight *
-                0.85
-            )
-        );
-
-    scroller.scrollTop =
-        Math.min(
-            maxTop,
-            oldTop + jump
-        );
-
-    await sleep(
-        SCROLL_WAIT
+    console.log(
+        '============================================'
     );
 
-    scrollAttempts++;
-}
+    console.log(
+        'MASS REMOVAL COMPLETE'
+    );
 
-// ============================================================
-// FINAL REPORT
-// ============================================================
+    console.log(
+        '============================================'
+    );
 
-console.log(
-    '============================================'
-);
+    console.log(
+        'Removed:',
+        removed
+    );
 
-console.log(
-    'MASS REMOVAL COMPLETE'
-);
+    console.log(
+        'Failed:',
+        failed
+    );
 
-console.log(
-    '============================================'
-);
+    console.log(
+        'Skipped:',
+        skipped
+    );
 
-console.log(
-    'Removed:',
-    removed
-);
+    console.log(
+        'Operations:',
+        operations
+    );
 
-console.log(
-    'Skipped:',
-    skipped
-);
+    console.log(
+        '============================================'
+    );
 
-console.log(
-    'Failed:',
-    failed
-);
+    console.log(
+        'PER-USER ATTEMPTS'
+    );
 
-console.log(
-    'Total operations:',
-    operationCount
-);
+    console.table(
+        [...attempts.entries()]
+            .map(
+                ([name, count]) => ({
+                    name,
+                    attempts: count,
+                    status:
+                        completed.has(name)
+                            ? 'REMOVED'
+                            : 'SKIPPED/FAILED'
+                })
+            )
+    );
 
-console.log(
-    '============================================'
-);
-
-console.log(
-    'ATTEMPTS PER USER:'
-);
-
-console.table(
-    [...removalAttempts.entries()]
-        .map(
-            ([name, attempts]) => ({
-                name,
-                attempts
-            })
-        )
-);
-
-console.log(
-    '============================================'
-);
+})();
