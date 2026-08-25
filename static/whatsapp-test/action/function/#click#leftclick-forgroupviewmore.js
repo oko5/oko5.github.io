@@ -125,7 +125,7 @@ function leftClick(action, memberName) {
     // ============================================================
 
     let attempts = 0;
-    const maxAttempts = 5;
+    const maxAttempts = 1;
 
     const findAndClickMenuItem = () => {
         attempts++;
@@ -151,7 +151,7 @@ function leftClick(action, memberName) {
             if (attempts < maxAttempts) {
                 setTimeout(
                     findAndClickMenuItem,
-                    50
+                    1
                 );
             } else {
                 console.error(
@@ -191,7 +191,7 @@ function leftClick(action, memberName) {
     // Start looking shortly after member click
     setTimeout(
         findAndClickMenuItem,
-        5
+        1
     );
 }
-rightClick("remuser","oekoff")
+leftClick("unadmin","oekoff")
