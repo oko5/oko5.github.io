@@ -1,19 +1,29 @@
+// ============================================================
+// WhatsApp — ONLY process the newest incoming tail-in message
+// ============================================================
+
 const processedContainers = new WeakSet();
+
 let newestMessageKey = null;
 let processing = false;
+let newestMessageTimer = null;
 
-// ==============================
+
+// ============================================================
 // Get compose editor
-// ==============================
+// ============================================================
+
 function getEditor() {
     return document.querySelector(
         '[data-testid="conversation-compose-box-input"][contenteditable="true"]'
     );
 }
 
-// ==============================
+
+// ============================================================
 // Instant type
-// ==============================
+// ============================================================
+
 function instantType(text) {
     const editor = getEditor();
 
@@ -27,11 +37,13 @@ function instantType(text) {
     const selection = window.getSelection();
     const range = document.createRange();
 
-    // Clear existing editor contents
+    // Select everything currently inside the editor
     range.selectNodeContents(editor);
+
     selection.removeAllRanges();
     selection.addRange(range);
 
+    // Clear existing text
     document.execCommand("delete", false, null);
 
     // Insert exactly once
@@ -42,9 +54,11 @@ function instantType(text) {
     return true;
 }
 
-// ==============================
+
+// ============================================================
 // Send
-// ==============================
+// ============================================================
+
 function sendMessage() {
     const button =
         document.querySelector('[data-testid="send"]') ||
@@ -56,18 +70,34 @@ function sendMessage() {
     }
 
     button.click();
+
     return true;
 }
 
-// ==============================
-// Extract message information
-// ==============================
+
+// ============================================================
+// Extract information from ONE message container
+// ============================================================
+
 function getMessageInfo(container) {
+
+    if (!container) {
+        return null;
+    }
+
+    // This container must contain an incoming tail
     const tail = container.querySelector(
         'span[data-icon="tail-in"]'
     );
 
-    if (!tail) return null;
+    if (!tail) {
+        return null;
+    }
+
+
+    // --------------------------------------------------------
+    // Author
+    // --------------------------------------------------------
 
     const author =
         container.querySelector('[data-testid="author"]');
@@ -75,168 +105,364 @@ function getMessageInfo(container) {
     const name =
         author?.textContent?.trim() || "";
 
+
+    // --------------------------------------------------------
+    // Message text
+    // --------------------------------------------------------
+
     const text =
-        container.querySelector('[data-testid="selectable-text"]');
+        container.querySelector(
+            '[data-testid="selectable-text"]'
+        );
 
     const message =
         text?.innerText?.trim() ||
         text?.textContent?.trim() ||
         "";
 
+
+    // --------------------------------------------------------
+    // Timestamp
+    // --------------------------------------------------------
+
     const copyable =
         container.querySelector('.copyable-text');
 
     const prePlain =
-        copyable?.getAttribute('data-pre-plain-text') || "";
+        copyable?.getAttribute(
+            'data-pre-plain-text'
+        ) || "";
+
 
     /*
-      Example:
-      [10:37, 6/9/2026] John:
+        Example:
+
+        [10:37, 6/9/2026] John:
     */
+
     const match = prePlain.match(
         /^\[([^,\]]+),\s*([^\]]+)\]/
     );
 
-    const time = match?.[1] || "";
-    const date = match?.[2] || "";
+    const time =
+        match?.[1] || "";
 
-    if (!name || !message) return null;
+    const date =
+        match?.[2] || "";
+
+
+    // --------------------------------------------------------
+    // Require actual data
+    // --------------------------------------------------------
+
+    if (!name || !message) {
+        return null;
+    }
+
 
     return {
         container,
         name,
         message,
         time,
-        date
+        date,
+        tail
     };
 }
 
-// ==============================
-// Convert WhatsApp timestamp
-// ==============================
-function timestampValue(info) {
-    if (!info.date || !info.time) {
-        return 0;
-    }
 
-    const parsed = new Date(
-        `${info.date} ${info.time}`
-    ).getTime();
+// ============================================================
+// Find the LAST / newest actual incoming tail-in
+// ============================================================
 
-    return Number.isNaN(parsed) ? 0 : parsed;
-}
-
-// ==============================
-// Find the ACTUAL newest incoming
-// ==============================
 function findNewestIncoming() {
-    const containers = [
+
+    const tails = [
         ...document.querySelectorAll(
-            '[data-testid="msg-container"]'
+            'span[data-icon="tail-in"]'
         )
     ];
 
-    let newest = null;
-    let newestTimestamp = -Infinity;
 
-    for (const container of containers) {
-        const info = getMessageInfo(container);
+    /*
+        WhatsApp's DOM order is used here.
 
-        if (!info) continue;
+        The LAST tail-in is treated as the newest
+        incoming message currently rendered.
+    */
 
-        const ts = timestampValue(info);
+    for (let i = tails.length - 1; i >= 0; i--) {
 
-        /*
-          If timestamp parsing works, use it.
-          If not, DOM order is used as fallback.
-        */
-        if (
-            ts > newestTimestamp ||
-            (ts === 0 && newest === null)
-        ) {
-            newest = info;
-            newestTimestamp = ts;
+        const tail = tails[i];
+
+        const container =
+            tail.closest(
+                '[data-testid="msg-container"]'
+            );
+
+        if (!container) {
+            continue;
         }
+
+
+        const info =
+            getMessageInfo(container);
+
+        if (!info) {
+            continue;
+        }
+
+
+        return info;
     }
 
-    return newest;
+
+    return null;
 }
 
-// ==============================
-// Process ONLY newest message
-// ==============================
+
+// ============================================================
+// Process ONLY the newest incoming message
+// ============================================================
+
 async function processNewestIncoming() {
-    if (processing) return;
 
-    const info = findNewestIncoming();
-
-    if (!info) return;
-
-    // Already processed this exact DOM message
-    if (processedContainers.has(info.container)) {
+    // Prevent overlapping processing
+    if (processing) {
         return;
     }
 
-    /*
-      Build a key as an additional protection
-      against WhatsApp recreating the same message
-      as another DOM node.
-    */
+
+    const info =
+        findNewestIncoming();
+
+
+    if (!info) {
+        return;
+    }
+
+
+    // --------------------------------------------------------
+    // Prevent processing the same DOM container twice
+    // --------------------------------------------------------
+
+    if (
+        processedContainers.has(
+            info.container
+        )
+    ) {
+        return;
+    }
+
+
+    // --------------------------------------------------------
+    // Extra duplicate protection
+    // --------------------------------------------------------
+
     const messageKey =
         `${info.date}|${info.time}|${info.name}|${info.message}`;
 
-    if (messageKey === newestMessageKey) {
-        processedContainers.add(info.container);
+
+    if (
+        messageKey === newestMessageKey
+    ) {
+
+        processedContainers.add(
+            info.container
+        );
+
         return;
     }
 
+
+    // --------------------------------------------------------
+    // Lock processing
+    // --------------------------------------------------------
+
     processing = true;
 
-    processedContainers.add(info.container);
-    newestMessageKey = messageKey;
+    processedContainers.add(
+        info.container
+    );
+
+    newestMessageKey =
+        messageKey;
+
+
+    // --------------------------------------------------------
+    // Create reply
+    // --------------------------------------------------------
 
     const reply =
         `${info.name} said ${info.message}`;
 
-    console.log("NEWEST INCOMING:");
-    console.log(reply);
 
-    if (instantType(reply)) {
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                sendMessage();
-                processing = false;
-            });
-        });
-    } else {
+    console.log(
+        "NEWEST INCOMING:"
+    );
+
+    console.log({
+        name: info.name,
+        message: info.message,
+        time: info.time,
+        date: info.date
+    });
+
+
+    console.log(
+        "REPLY:",
+        reply
+    );
+
+
+    // --------------------------------------------------------
+    // Type
+    // --------------------------------------------------------
+
+    const typed =
+        instantType(reply);
+
+
+    if (!typed) {
+
         processing = false;
+
+        return;
     }
+
+
+    /*
+        Give WhatsApp a couple of rendering frames
+        before clicking Send.
+
+        This prevents the send button from being clicked
+        before React/WhatsApp has registered the inserted text.
+    */
+
+    requestAnimationFrame(() => {
+
+        requestAnimationFrame(() => {
+
+            sendMessage();
+
+            processing = false;
+        });
+
+    });
+
 }
 
-// ==============================
-// Watch DOM changes
-// ==============================
-const observer = new MutationObserver(() => {
-    /*
-      Don't immediately process every added node.
-      WhatsApp often adds several pieces of the same
-      message separately.
 
-      Wait until the DOM settles, then find the
-      newest actual incoming message.
-    */
-    clearTimeout(window.__newestMessageTimer);
+// ============================================================
+// MutationObserver
+// ============================================================
 
-    window.__newestMessageTimer = setTimeout(() => {
-        processNewestIncoming();
-    }, 50);
-});
+const observer =
+    new MutationObserver(
+        (mutations) => {
 
-observer.observe(document.body, {
-    childList: true,
-    subtree: true
-});
+            let foundIncoming =
+                false;
+
+
+            // ------------------------------------------------
+            // Only care about mutations that introduce
+            // an actual tail-in
+            // ------------------------------------------------
+
+            for (
+                const mutation of mutations
+            ) {
+
+                for (
+                    const node of mutation.addedNodes
+                ) {
+
+                    if (
+                        node.nodeType !==
+                        Node.ELEMENT_NODE
+                    ) {
+                        continue;
+                    }
+
+
+                    // Node itself is tail-in
+                    if (
+                        node.matches?.(
+                            'span[data-icon="tail-in"]'
+                        )
+                    ) {
+
+                        foundIncoming = true;
+
+                        break;
+                    }
+
+
+                    // Or tail-in exists somewhere inside
+                    if (
+                        node.querySelector?.(
+                            'span[data-icon="tail-in"]'
+                        )
+                    ) {
+
+                        foundIncoming = true;
+
+                        break;
+                    }
+
+                }
+
+
+                if (foundIncoming) {
+                    break;
+                }
+            }
+
+
+            // Ignore unrelated WhatsApp DOM changes
+            if (!foundIncoming) {
+                return;
+            }
+
+
+            // ------------------------------------------------
+            // Debounce multiple pieces of the same message
+            // ------------------------------------------------
+
+            clearTimeout(
+                newestMessageTimer
+            );
+
+
+            newestMessageTimer =
+                setTimeout(() => {
+
+                    processNewestIncoming();
+
+                }, 20);
+
+        }
+    );
+
+
+// ============================================================
+// Start observing
+// ============================================================
+
+observer.observe(
+    document.body,
+    {
+        childList: true,
+        subtree: true
+    }
+);
+
+
+// ============================================================
+// Ready
+// ============================================================
 
 console.log(
-    "Monitoring ONLY the newest incoming message."
+    "Monitoring ONLY the newest incoming tail-in message."
 );
